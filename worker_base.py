@@ -122,6 +122,7 @@ class Human(Base):
         if self.age > 19:
             # если человеку больше 19 лет иначе он не работает
             start =  self.birth_date + timedelta(days=366*20)
+            self.migrate_record()
         else:
             start = None
         return start
@@ -152,16 +153,19 @@ class Human(Base):
                 self.pos_id = self.pos.position
             tranfered = self.migrate()
             if tranfered:
-                self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))
+                self.migrate_record()
+
+    def migrate_record(self):
+        self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))
 
     def migrate(self):
         targ = get_rand_firm_id()
         if self.firm_id != targ:
-            targ_firm_rating = self.session.query(Firm.rating).filter(Firm.id==targ).scalar()
+            targ_firm_rating = self.session.query(Firm.rating).filter(Firm.id == targ).scalar()
             attraction_mod = targ_firm_rating - self.firm.rating
             chanse = (40 + attraction_mod) / (40 * 365)
             if random() < chanse:
-                self.firm_id = self.firm.id
+                self.firm_id = targ
                 return True
         return False
 
@@ -183,9 +187,6 @@ class Firm(Base):
         self.rating = self.new_rating()
         self.open_date = get_anno()
 
-    def populate(self, num):
-        for _ in range(num):
-            self.residents.append(None)
 
     def update(self):
         if get_anno().day == 1 and get_anno().month == 1:

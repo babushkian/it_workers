@@ -8,7 +8,8 @@ from worker_base import (Base,
                         Position,
                         PosBase,
                         Firm,
-                        Human
+                        Human,
+                        HumanFirm
                          )
 
 
@@ -56,3 +57,10 @@ x = session.query(func.count(Human.id).label('cont'), PosBase.name).join(PosBase
     Human.pos_id).all()
 for y in x:
     print(y.cont, y.name)
+
+x = session.query(HumanFirm.human_id, HumanFirm.move_to_firm_date, HumanFirm.firm_id, Firm.name).join(Firm).filter(HumanFirm.human_id<11).order_by(HumanFirm.human_id, HumanFirm.move_to_firm_date)
+print(x)
+x = x.all()
+print(x)
+for i in x:
+    print(f'{i.human_id:3d}  {i.move_to_firm_date}  {i.firm_id:3d}  {i.name}')
