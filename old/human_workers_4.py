@@ -81,7 +81,7 @@ class Position():
                 return True
             return False
 
-    def demotion():# понижние по службе
+    def demotion(self):# понижние по службе
         pass
 
 
@@ -227,6 +227,7 @@ firm_dict = {}
 for i in firms_list:
     firm_dict[i.id] = i
 
+print(firm_dict)
 
 for i in Position.POSITIONS:
     session.add(PosBase(name = i))
@@ -234,12 +235,12 @@ session.commit()
 
 
 people = list()
-for i in range(400):
+for i in range(100):
     people.append(Human(session, firm_dict,  get_rand_firm_id()))
 session.add_all(people)
 session.commit()
 
-for t in range(365*5):
+for t in range(25*5):
     ANNO += timedelta(days=1)
     for f in firms_list:
         f.update()

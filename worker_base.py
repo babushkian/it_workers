@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String,  Date,  ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
-
+from sqlalchemy.orm import relationship
 
 from random import choice, randint, random
 from datetime import date, timedelta
@@ -15,13 +15,14 @@ Base = declarative_base()
 class Position():
     MULTIPLIER = 365
     PROGRESSION = 2  # основание степени (тружность получения повышения растет по степенному закону в завистмости от должности)
-    POSITIONS = ['стажёр', 'инженер', 'старший инженер', 'главный инженер', 'начальник отдела',
+    POSITIONS = ['безработный', 'стажёр', 'инженер', 'старший инженер', 'главный инженер', 'начальник отдела',
                  'начальник департамента', 'директор']
     CAP = len(POSITIONS) - 1
 
-    def __init__(self, ses):
+    def __init__(self, ses, human):
         self.session = ses
-        self.__position = self.session.query(PosBase.id).first()[0]
+        self.human = human
+        self.__position = 1  if self.human.start_work is None else 2
 
     @property
     def position(self):
@@ -34,9 +35,17 @@ class Position():
 
     # повышение по службе
     def promotion(self, talent, experience):
+        # переводим человека из безработынх на его первую должность
+        if self.human.start_work is not None and self.__position == 1:
+            self.__position = 2
+        # шанс на повышение
+        # зависит от трудового опыта - чем больше стаж человека, тем больше шанс повышения
+        # от таланта: чем больше талант, тем легче получит повышение
+        # и от занимаемой должности: шанс перейти на следующую ступень в два раза меньше
         if self.__position < Position.CAP:
             x = random()
-            base_mod = 1 / (Position.MULTIPLIER * Position.PROGRESSION ** self.__position)
+            # отнимаю от позиции единицу, чтобы безработные не увеличивали степень в формуле
+            base_mod = 1 / (Position.MULTIPLIER * Position.PROGRESSION ** (self.__position-1))
             # умножает время перехода на следующую должность. Для умных время до повыщения сокращается
             chisl = (2 * settings.TALENT_MAX + talent)
             talent_mod = chisl / settings.TALENT_RANGE
@@ -80,31 +89,49 @@ class Human(Base):
     fname = Column(String(50))
     sname = Column(String(50))
     lname = Column(String(50))
-    age = Column(Date)
-    talent = Column(Integer)
-    srart_work = Column(Date)
-    firm_id = Column(Integer, ForeignKey('firms.id'))
-    pos_id = Column(Integer, ForeignKey('positions.id'))
+    birth_date = Column(Date, index=True)
+    talent = Column(Integer, index=True)
+    start_work = Column(Date)
+    firm_id = Column(Integer, ForeignKey('firms.id'), index=True)
+    pos_id = Column(Integer, ForeignKey('positions.id'), index=True)
+    death_date = Column(Date, index=True)
+    retire_date = Column(Date, index=True)
+    firm = relationship('Firm', backref='humans')
 
     # дата начала работы
     # стажю. От него зависит вероятность продвижения по карьернойц лестнице
     # карьерная лестница: несколько ступеней, вероятность продвиджения на следуюшую ступень меньше, чем на предыдущую (*1.5)
-    # талант: влияет на веротность повышения и на вероятность понижения
+    # талант: влияет на вероятность повышения и на вероятность понижения
     HUM_COUNTER = 1
 
-    def __init__(self, ses, firm_dict, firm_id):
-        self.firm_dict = firm_dict
+    def __init__(self, ses):
         self.session = ses
         self.fname = choice(settings.first_name)  #
         self.sname = choice(settings.second_name)  #
         self.lname = choice(settings.last_name)  #
-        self.age = date(randint(1960, 1989), randint(1, 12), randint(1, 28))  # день рождения
+        self.birth_date = date(randint(1970, 1996), randint(1, 12), randint(1, 28))  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
-        self.srart_work = self.age + timedelta(days=365 * 20)  # дата начала работы
-        self.pos = Position(self.session)
+        self.start_work = self.check_start_work()   # дата начала работы
+        self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
         self.pos_id = self.pos.position
-        self.firm = self.firm_dict[firm_id]
-        self.firm_id = firm_id
+        self.firm_id = get_rand_firm_id()
+
+
+    def check_start_work(self):
+        # как только человеку исполняется 20 лет, он начинает работать
+        if self.age > 19:
+            # если человеку больше 19 лет иначе он не работает
+            start =  self.birth_date + timedelta(days=366*20)
+        else:
+            start = None
+        return start
+
+    @property
+    def age(self):
+        today = get_anno()
+        age = today.year - self.birth_date.year - ((today.month, today.day) < (self.birth_date.month, self.birth_date.day))
+        return age
+
 
     @property
     def position(self):
@@ -112,30 +139,34 @@ class Human(Base):
 
     @property
     def experience(self):
-        return (get_anno() - self.srart_work).days
+        return (get_anno() - self.start_work).days
 
     def update(self):
-        promoted = self.pos.promotion(self.talent, self.experience)
-        if promoted:
-            self.session.add(HumanPosition(human_id=self.id, pos_id=self.pos.position, move_to_position_date=get_anno()))
-            self.pos_id = self.pos.position
-        tranfered = self.migrate()
-        if tranfered:
-            self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))
+        if self.start_work is None:
+            self.start_work = self.check_start_work()
+
+        if self.start_work is not None:
+            promoted = self.pos.promotion(self.talent, self.experience)
+            if promoted:
+                self.session.add(HumanPosition(human_id=self.id, pos_id=self.pos.position, move_to_position_date=get_anno()))
+                self.pos_id = self.pos.position
+            tranfered = self.migrate()
+            if tranfered:
+                self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))
 
     def migrate(self):
         targ = get_rand_firm_id()
         if self.firm_id != targ:
-            attraction_mod = self.firm_dict[targ].attraction - self.firm.attraction
+            targ_firm_rating = self.session.query(Firm.rating).filter(Firm.id==targ).scalar()
+            attraction_mod = targ_firm_rating - self.firm.rating
             chanse = (40 + attraction_mod) / (40 * 365)
             if random() < chanse:
-                self.firm = self.firm_dict[targ]
                 self.firm_id = self.firm.id
                 return True
         return False
 
     def __repr__(self):
-        s = f'{self.lname} {self.fname} {self.sname}, {self.age}, талант:{self.talent} \
+        s = f'{self.lname} {self.fname} {self.sname}, {self.birth_date}, талант:{self.talent} \
         фирма: "{self.firm.name}" долж:{self.pos.posname}, стаж: {self.experience}'
         return s
 
@@ -144,10 +175,13 @@ class Firm(Base):
     __tablename__ = 'firms'
     id = Column(Integer, primary_key=True)
     name = Column(String(70))
+    rating = Column(Integer)
+    open_date = Column(Date)
 
     def __init__(self, name):
         self.name = name
-        self.attraction = randint(10, 40)
+        self.rating = self.new_rating()
+        self.open_date = get_anno()
 
     def populate(self, num):
         for _ in range(num):
@@ -155,8 +189,15 @@ class Firm(Base):
 
     def update(self):
         if get_anno().day == 1 and get_anno().month == 1:
-            self.attraction += randint(-4, 4)
+            self.update_rating()
+
+    def  new_rating(self):
+        return randint(10, 40)
+
+    def update_rating(self):
+        r = self.rating + randint(-4, 4)
+        self.rating = max(0, r)
 
     def __repr__(self):
-        return f'<id:{self.id} "{self.name}"  престижность: {self.attraction}>'
+        return f'<id:{self.id} "{self.name}"  рейтинг: {self.rating}>'
 

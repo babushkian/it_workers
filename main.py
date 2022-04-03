@@ -36,33 +36,39 @@ session = Session()
 # создаем все таблицы
 Base.metadata.create_all(engine)
 
-# заполняем таблицу фирм
-firms_list  = list()
-for  name in settings.firm_names:
-    fi = Firm(name)
-    firms_list.append(fi)
+def create_all_firms()->dict[int, Firm]:
+    # заполняем таблицу фирм
+    firms_list  = list()
+    for  name in settings.firm_names:
+        fi = Firm(name)
+        firms_list.append(fi)
 
-session.add_all(firms_list)
-session.commit()
-firm_dict = {}
-for i in firms_list:
-    firm_dict[i.id] = i
+    session.add_all(firms_list)
+    session.commit()
+    firm_dict: dict[int, Firm] = {}
+    for i in firms_list:
+        firm_dict[i.id] = i
+    return firm_dict
+
+def create_postiton_names():
+    for i in Position.POSITIONS:
+        session.add(PosBase(name = i))
+    session.commit()
 
 
-for i in Position.POSITIONS:
-    session.add(PosBase(name = i))
-session.commit()    
 
+firm_dict = create_all_firms()
+create_postiton_names()
 
 people = list()
 for i in range(400):
-    people.append(Human(session, firm_dict,  settings.get_rand_firm_id()))
+    people.append(Human(session))
 session.add_all(people)
 session.commit()
 
 for t in range(int(365 * SIM_YEARS)):
     time_pass()
-    for f in firms_list:
+    for f in firm_dict.values():
         f.update()
     for p in people:
         p.update()
