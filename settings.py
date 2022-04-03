@@ -1,5 +1,5 @@
 from random import  randint
-from datetime import date
+from datetime import date, timedelta
 
 firm_names = ['Омскшина', 'Новотэк', 'Карсонс', 'Иркасофт', 'Томат', 'Тюмция', 'Курганстрой', 'Хабр',
        'Барнс', 'Норштокинг', 'Пенестер', 'Костромарс']
@@ -13,19 +13,27 @@ last_name = ['Иванов', 'Петров', 'Сидоров', 'Ковалев',
         'Густоперов', 'Говоров', 'Жеребилов', 'Покровский', 'Алишеров', 'Донской', 'Черданцев', 'Барановский', 'Чепига',
         'Парахуда', 'Пережога']
 
-SIM_YEARS = 1
+SIM_YEARS = .6
 
 # количество фирм
 COL_FIRM = len(firm_names)
 
 
-# возвращяет индекс случайной фирмы
+# возвращает индекс случайной фирмы
 def get_rand_firm_id() -> int:
     return (randint(1, COL_FIRM))
 
 
 # дата начало симуляции
+
 ANNO = date(2010, 1, 1)
+
+def time_pass():
+    global ANNO
+    ANNO += timedelta(days=1)
+
+def get_anno():
+    return ANNO
 
 
 TALENT_MIN = -3

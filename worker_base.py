@@ -6,7 +6,8 @@ from random import choice, randint, random
 from datetime import date, timedelta
 
 import settings
-from settings import get_rand_firm_id, ANNO
+from settings import get_rand_firm_id, get_anno
+
 
 
 Base = declarative_base()
@@ -111,16 +112,16 @@ class Human(Base):
 
     @property
     def experience(self):
-        return (ANNO - self.srart_work).days
+        return (get_anno() - self.srart_work).days
 
     def update(self):
         promoted = self.pos.promotion(self.talent, self.experience)
         if promoted:
-            self.session.add(HumanPosition(human_id=self.id, pos_id=self.pos.position, move_to_position_date=ANNO))
+            self.session.add(HumanPosition(human_id=self.id, pos_id=self.pos.position, move_to_position_date=get_anno()))
             self.pos_id = self.pos.position
         tranfered = self.migrate()
         if tranfered:
-            self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=ANNO))
+            self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))
 
     def migrate(self):
         targ = get_rand_firm_id()
@@ -153,7 +154,7 @@ class Firm(Base):
             self.residents.append(None)
 
     def update(self):
-        if ANNO.day == 1 and ANNO.month == 1:
+        if get_anno().day == 1 and get_anno().month == 1:
             self.attraction += randint(-4, 4)
 
     def __repr__(self):

@@ -2,16 +2,19 @@
 from sqlalchemy import create_engine,  event
 from sqlalchemy.orm import sessionmaker
 
-from datetime import  timedelta
+
 
 import settings
-from settings import ANNO, SIM_YEARS
+from settings import SIM_YEARS, time_pass
 from worker_base import (Base,
                         Position,
                         PosBase,
                         Firm,
                         Human
                          )
+
+
+
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
@@ -57,8 +60,8 @@ for i in range(400):
 session.add_all(people)
 session.commit()
 
-for t in range(365 * SIM_YEARS):
-    ANNO += timedelta(days=1)
+for t in range(int(365 * SIM_YEARS)):
+    time_pass()
     for f in firms_list:
         f.update()
     for p in people:
