@@ -1,0 +1,7 @@
+1
+*.pyc
+*__pycache__
+*.csv
+sim_*
+.idea
+*workers.db
