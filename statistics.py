@@ -1,88 +1,58 @@
-poo = {i: 0 for i in range(len(Position.POSITIONS))}
-print(ANNO)
-for p in people:
-    poo[p.pos.position] += 1
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func, asc, desc, distinct
 
-for i in poo:
-    print(Position.POSITIONS[i], poo[i])
-
-print('=' * 20)
-
-talcount = {i: 0 for i in range(TALENT_MIN, TALENT_MAX + 1)}
-talsum = {i: 0 for i in range(TALENT_MIN, TALENT_MAX + 1)}
-for p in people:
-    talcount[p.talent] += 1
-    talsum[p.talent] += p.pos.position
-
-print('Среднее значение должности в зависмомти от таланта')
-talmean = dict()
-for c in talcount:
-    if talcount[c] == 0:
-        talmean[c] = 0
-    else:
-        talmean[c] = talsum[c] / talcount[c]
-    print(f'талант:{c}, людей {talcount[c]} средняя должность {talmean[c]}')
-
-limits = {0: 20, 1: 30, 2: 40, 3: 50, 4: 60, 5: 1000}
+from settings import SIM_YEARS, time_pass
+from worker_base import (Base,
+                        Position,
+                        PosBase,
+                        Firm,
+                        Human
+                         )
 
 
-def pockets(birth):
-    ret = None
-    age = (ANNO - birth).days / 365
-    for i in limits:
-        if age < limits[i]:
-            ret = i
-            break
-    return i
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode = MEMORY")
+    cursor.execute("PRAGMA synchronous = OFF")
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.close()
+
+engine = create_engine(f"sqlite:///workers.db", echo=False)
+Session = sessionmaker()
+Session.configure(bind=engine)
+session = Session()
+
+all_rec = session.query(Human).count()
+print(f'Всего записей: {all_rec}')
 
 
-agcount = {i: 0 for i in range(len(limits))}
-agsum = {i: 0 for i in range(len(limits))}
-for p in people:
-    agcount[pockets(p.age)] += 1
-    agsum[pockets(p.age)] += p.pos.position
+# средняя квалификация по всем людям
+print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
+mean_pos = session.query(func.sum(Human.pos_id).label('p_sum'),func.count(Human.pos_id).label('p_count')).one()
+print(mean_pos)
 
-print('=' * 20)
-print('Среднее значение должности в зависмомти от возраста')
-agmean = dict()
-for c in agcount:
-    if agcount[c] == 0:
-        agmean[c] = 0
-    else:
-        agmean[c] = agsum[c] / agcount[c]
-    print(f'возраст до:{limits[c]}, людей {agcount[c]} средняя должность {agmean[c]}')
+print(f"Среняя квалификация людей: {mean_pos.p_sum / mean_pos.p_count}")
 
-# вычисляем количество людей в каждой фирме
-firms_count = {i: 0 for i in firms_list}
-for p in people:
-    firms_count[p.firm] += 1
 
-print('=' * 20)
-for f in firms_count:
-    print(f'{f.name}  рпестиж: {f.attraction}   сотрудников: {firms_count[f]}')
-
-# просто выборка из несеольких людей
-print('=' * 20)
-for i in people[:16]:
-    print(i)
+# средняя квалификация в зависимости от таланта
+p_tal = session.query(func.sum(Human.pos_id).label('tal_sum'), func.count(Human.talent).label('tal_count'), Human.talent)\
+    .group_by(Human.talent).order_by(Human.talent).all()
+print('средняя квалификация в зависимости от таланта')
+for i in p_tal:
+    print(i.talent, i.tal_sum/i.tal_count)
 
 # выборка имеющихся должностей
-print('=' * 20)
+print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
 psd = session.query(distinct(Human.pos_id)).order_by(Human.pos_id).all()
 print(psd)
 
 # РАСПРЕДЕЛЕНИЕ ЛЮДЕЙ ПО ДОЛЖНОСТЯМ
 # первый способ
-print('*' * 40, '/nпервый способ')
+print('*' * 40, '\nРаспределение должностей среди людей')
 x = session.query(func.count(Human.id).label('cont'), PosBase.name).join(PosBase).group_by(Human.pos_id).order_by(
     Human.pos_id).all()
 for y in x:
     print(y.cont, y.name)
-
-# второй способ
-print('*' * 40, '/nвторой способ')
-for i in psd:
-    x = session.query(func.count(Human.id))
-    x = x.filter(Human.pos_id == i[0])
-    x = x.scalar()
-    print(session.query(PosBase.name).filter(PosBase.id == i[0]).scalar(), x)
