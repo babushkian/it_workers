@@ -6,14 +6,15 @@ from random import choice, randint, random
 from datetime import date, timedelta
 
 import settings
-from settings import get_rand_firm_id, get_anno
+from settings import (get_rand_firm_id, get_anno, YEAR_LENGTH,
+                      RETIREMENT_DELTA, RETIREMENT_MIN_AGE,
+                      DEATH_DELTA, DEATH_MIN_AGE)
 
 
 
 Base = declarative_base()
 
 class Position():
-    MULTIPLIER = 365
     PROGRESSION = 2  # основание степени (тружность получения повышения растет по степенному закону в завистмости от должности)
     POSITIONS = ['безработный', 'стажёр', 'инженер', 'старший инженер', 'главный инженер', 'начальник отдела',
                  'начальник департамента', 'директор']
@@ -45,7 +46,7 @@ class Position():
         if self.__position < Position.CAP:
             x = random()
             # отнимаю от позиции единицу, чтобы безработные не увеличивали степень в формуле
-            base_mod = 1 / (Position.MULTIPLIER * Position.PROGRESSION ** (self.__position-1))
+            base_mod = 1 / (YEAR_LENGTH * Position.PROGRESSION ** (self.__position-1))
             # умножает время перехода на следующую должность. Для умных время до повыщения сокращается
             chisl = (2 * settings.TALENT_MAX + talent)
             talent_mod = chisl / settings.TALENT_RANGE
@@ -109,23 +110,62 @@ class Human(Base):
         self.fname = choice(settings.first_name)  #
         self.sname = choice(settings.second_name)  #
         self.lname = choice(settings.last_name)  #
-        self.birth_date = date(randint(1970, 1996), randint(1, 12), randint(1, 28))  # день рождения
+        self.birth_date = date(randint(1950, 1998), randint(1, 12), randint(1, 28))  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
-        self.start_work = self.check_start_work()   # дата начала работы
+        self.start_work = None # сначала присваиваем None, потом вызываем функцию
+        self.check_start_work()   # дата начала работы
         self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
         self.pos_id = self.pos.position
         self.firm_id = get_rand_firm_id()
 
-
     def check_start_work(self):
-        # как только человеку исполняется 20 лет, он начинает работать
-        if self.age > 19:
-            # если человеку больше 19 лет иначе он не работает
-            start =  self.birth_date + timedelta(days=366*20)
-            self.migrate_record()
+        if self.start_work is None:
+            # как только человеку исполняется 20 лет, он начинает работать
+            if self.age < 20:
+                return False
+            else:
+                # если человеку больше 19 лет иначе он не работает
+                self.start_work =  self.birth_date + timedelta(days=366*20)
+                self.migrate_record()
+                return True
         else:
-            start = None
-        return start
+            return True
+
+    def check_retirement(self):
+        if self.retire_date is None:
+            if self.age < RETIREMENT_MIN_AGE:
+                return False
+            else:
+                print('Old')
+                treshold = .01 + (self.age - RETIREMENT_MIN_AGE)/(DEATH_DELTA*YEAR_LENGTH)
+                print(self.age, treshold)
+                if random() < treshold:
+                    print('Retired')
+                    self.set_retired()
+                    return True
+        else:
+            return True
+
+    def check_death(self):
+        if self.death_date is None:
+            if self.age < DEATH_MIN_AGE:
+                return False
+            else:
+                treshold = (self.age - DEATH_MIN_AGE)/(2*DEATH_DELTA*DEATH_DELTA*YEAR_LENGTH)
+                if random() < treshold:
+                    print('Dead')
+                    self.set_dead()
+                    return True
+        else:
+            return True
+
+
+    def set_retired(self):
+        self.retire_date = get_anno()
+
+    def set_dead(self):
+        self.death_date = get_anno()
+        self.set_retired()
 
     @property
     def age(self):
@@ -143,17 +183,19 @@ class Human(Base):
         return (get_anno() - self.start_work).days
 
     def update(self):
-        if self.start_work is None:
-            self.start_work = self.check_start_work()
+        if self.check_death() is False:
+            if self.check_retirement() is False:
+                if self.check_start_work() is True:
+                    promoted = self.pos.promotion(self.talent, self.experience)
+                    if promoted:
+                        self.change_position()
+                    tranfered = self.migrate()
+                    if tranfered:
+                        self.migrate_record()
 
-        if self.start_work is not None:
-            promoted = self.pos.promotion(self.talent, self.experience)
-            if promoted:
-                self.session.add(HumanPosition(human_id=self.id, pos_id=self.pos.position, move_to_position_date=get_anno()))
-                self.pos_id = self.pos.position
-            tranfered = self.migrate()
-            if tranfered:
-                self.migrate_record()
+    def change_position(self):
+        self.session.add(HumanPosition(human_id=self.id, pos_id=self.pos.position, move_to_position_date=get_anno()))
+        self.pos_id = self.pos.position
 
     def migrate_record(self):
         self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))

@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 
 import settings
-from settings import SIM_YEARS, time_pass
+from settings import SIM_YEARS, time_pass, YEAR_LENGTH
 from worker_base import (Base,
                         Position,
                         PosBase,
@@ -66,7 +66,7 @@ for i in range(400):
 session.add_all(people)
 session.commit()
 
-for t in range(int(365 * SIM_YEARS)):
+for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     time_pass()
     for f in firm_dict.values():
         f.update()

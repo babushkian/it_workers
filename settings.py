@@ -13,10 +13,19 @@ last_name = ['Иванов', 'Петров', 'Сидоров', 'Ковалев',
         'Густоперов', 'Говоров', 'Жеребилов', 'Покровский', 'Алишеров', 'Донской', 'Черданцев', 'Барановский', 'Чепига',
         'Парахуда', 'Пережога', 'Лядов', 'Конашенков', 'Перельман', 'Марушкин', 'Алмазбеков']
 
-SIM_YEARS = 3
+SIM_YEARS = 10
+YEAR_LENGTH = 365
 
 # количество фирм
 COL_FIRM = len(firm_names)
+
+DEATH_MIN_AGE = 30
+DEATH_MAX_AGE = 100
+DEATH_DELTA =DEATH_MAX_AGE - DEATH_MIN_AGE
+
+RETIREMENT_MIN_AGE = 60
+RETIREMENT_MAX_AGE = 80
+RETIREMENT_DELTA = RETIREMENT_MAX_AGE - RETIREMENT_MIN_AGE
 
 
 # возвращает индекс случайной фирмы
@@ -39,5 +48,5 @@ def get_anno():
 TALENT_MIN = -3
 TALENT_MAX = 3
 TALENT_RANGE = TALENT_MAX - TALENT_MIN
-EXPERIENCE_CAP = 1 / (365 * 40)  # через сорок лет работы шанс получить повышение удваивается
+EXPERIENCE_CAP = 1 / (YEAR_LENGTH * 40)  # через сорок лет работы шанс получить повышение удваивается
 
