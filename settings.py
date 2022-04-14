@@ -1,5 +1,5 @@
 from random import  randint
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 from names import firm_names, first_name, second_name, last_name
 
 SIM_YEARS = .1
@@ -10,7 +10,12 @@ COL_FIRM = len(firm_names)
 
 DEATH_MIN_AGE = 30
 DEATH_MAX_AGE = 100
-DEATH_DELTA =DEATH_MAX_AGE - DEATH_MIN_AGE
+DEATH_DELTA = DEATH_MAX_AGE - DEATH_MIN_AGE
+
+OLDEST_BIRTH_DATE = datetime(1950, 1, 1)
+YONGEST_BIRTH_DATE = datetime(1998, 1, 1)
+BIRTH_RANGE = (YONGEST_BIRTH_DATE - OLDEST_BIRTH_DATE).days
+
 
 RETIREMENT_MIN_AGE = 60
 RETIREMENT_MAX_AGE = 80
@@ -21,6 +26,11 @@ RETIREMENT_DELTA = RETIREMENT_MAX_AGE - RETIREMENT_MIN_AGE
 def get_rand_firm_id() -> int:
     return (randint(1, COL_FIRM))
 
+# возвращает дату рождения
+def get_birthday()->date:
+    add_days = randint(0, BIRTH_RANGE)
+    bd = OLDEST_BIRTH_DATE + timedelta(days=add_days)
+    return bd
 
 # дата начало симуляции
 

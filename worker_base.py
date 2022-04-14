@@ -3,12 +3,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
 from random import choice, randint, random
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 
 import settings
 from settings import (get_rand_firm_id, get_anno, YEAR_LENGTH,
                       RETIREMENT_DELTA, RETIREMENT_MIN_AGE,
-                      DEATH_DELTA, DEATH_MIN_AGE)
+                      DEATH_DELTA, DEATH_MIN_AGE,
+                      get_birthday)
 
 
 
@@ -110,7 +111,7 @@ class Human(Base):
         self.fname = choice(settings.first_name)  #
         self.sname = choice(settings.second_name)  #
         self.lname = choice(settings.last_name)  #
-        self.birth_date = date(randint(1950, 1998), randint(1, 12), randint(1, 28))  # день рождения
+        self.birth_date = get_birthday()  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
         self.check_start_work()   # дата начала работы
