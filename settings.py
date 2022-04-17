@@ -2,7 +2,7 @@ from random import  randint
 from datetime import datetime, date, timedelta
 from names import firm_names, first_name, second_name, last_name
 
-SIM_YEARS = .1
+SIM_YEARS = 2.1
 YEAR_LENGTH = 365
 INITIAL_PEOPLE_NUMBER = 100
 

@@ -3,6 +3,8 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from random import randint, random
 
+from sqlalchemy.orm import relationship
+
 import settings
 from settings import (get_anno, YEAR_LENGTH)
 
@@ -85,11 +87,17 @@ class Firm(Base):
     name = Column(String(70))
     rating = Column(Integer)
     open_date = Column(Date)
+    ratings = relationship('FirmRating', backref='firms')
 
-    def __init__(self, name):
+
+    def __init__(self, ses, name):
+        self.session = ses
         self.name = name
         self.rating = self.new_rating()
         self.open_date = get_anno()
+
+    def assign(self):
+        self.session.add(FirmRating(firm=self.id, rating=self.rating, rdate=get_anno()))
 
 
     def update(self):
@@ -102,7 +110,15 @@ class Firm(Base):
     def update_rating(self):
         r = self.rating + randint(-4, 4)
         self.rating = max(0, r)
+        self.assign()
 
     def __repr__(self):
         return f'<id:{self.id} "{self.name}"  рейтинг: {self.rating}>'
 
+
+class FirmRating(Base):
+    __tablename__ = 'firm_ratings'
+    id = Column(Integer, primary_key=True)
+    firm = Column(Integer, ForeignKey('firms.id'))
+    rating = Column(Integer)
+    rdate = Column(Date)

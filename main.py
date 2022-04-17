@@ -43,15 +43,18 @@ def create_all_firms() -> dict[int, Firm]:
     # заполняем таблицу фирм
     firms_list  = list()
     for name in settings.firm_names:
-        fi = Firm(name)
+        fi = Firm(session, name)
         firms_list.append(fi)
+        session.add(fi)
+        fi.assign()
 
-    session.add_all(firms_list)
     session.commit()
+
     firm_dict: dict[int, Firm] = {}
     for i in firms_list:
         firm_dict[i.id] = i
     return firm_dict
+
 
 def create_postiton_names():
     for i in Position.POSITIONS:
