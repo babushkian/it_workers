@@ -48,7 +48,6 @@ class Human(Base):
         self.birth_date = get_birthday()  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
-        self.check_start_work()   # дата начала работы
         self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
         self.pos_id = self.pos.position
         self.firm_id = get_rand_firm_id()
@@ -60,7 +59,7 @@ class Human(Base):
         но из инита Human сделать запись в нее нельзя, та как у Human  в этот момент еще не определен id
         '''
         self.change_position()
-        self.migrate_record()
+        self.check_start_work()
 
 
 

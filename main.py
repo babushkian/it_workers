@@ -45,9 +45,10 @@ def create_all_firms() -> dict[int, Firm]:
     for name in settings.firm_names:
         fi = Firm(session, name)
         firms_list.append(fi)
-        session.add(fi)
+    session.add_all(firms_list)
+    session.flush()
+    for fi in firms_list:
         fi.assign()
-
     session.commit()
 
     firm_dict: dict[int, Firm] = {}
@@ -61,26 +62,24 @@ def create_postiton_names():
         session.add(PosBase(name = i))
     session.commit()
 
+# инициируем людей
+def people_init():
+    people = list()
+    for i in range(INITIAL_PEOPLE_NUMBER):
+        people.append(Human(session))
+    session.add_all(people)
+    session.flush()
+    for hum in people:
+        hum.assign()
+    session.commit()
+    return people
+
+
 
 
 firm_dict = create_all_firms()
 create_postiton_names()
-
-people = list()
-
-# инициируем людей
-for i in range(INITIAL_PEOPLE_NUMBER):
-    people.append(Human(session))
-session.add_all(people)
-session.commit()
-
-# дополнительно инициируем те опции, котоыре нельзя инициироватль сразу, потому что записи
-# о человеке в базу не внесены
-for i in people:
-    i.assign()
-session.add_all(people)
-session.commit()
-
+people = people_init()
 
 for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     time_pass()
