@@ -1,18 +1,21 @@
 ﻿from sqlalchemy.engine import Engine
 from sqlalchemy import create_engine,  event
 from sqlalchemy.orm import sessionmaker
+import random
+random.seed(666)
 
 
 
 import settings
-from settings import SIM_YEARS, time_pass, YEAR_LENGTH
-from worker_base import (Base,
-                        Position,
-                        PosBase,
-                        Firm,
-                        Human
-                         )
-
+from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
+                        INITIAL_PEOPLE_NUMBER
+                      )
+from model.worker_base import (Base,
+                               Position,
+                               PosBase,
+                               Firm,
+                               )
+from model.human import Human
 
 
 @event.listens_for(Engine, "connect")
@@ -36,10 +39,10 @@ session = Session()
 # создаем все таблицы
 Base.metadata.create_all(engine)
 
-def create_all_firms()->dict[int, Firm]:
+def create_all_firms() -> dict[int, Firm]:
     # заполняем таблицу фирм
     firms_list  = list()
-    for  name in settings.firm_names:
+    for name in settings.firm_names:
         fi = Firm(name)
         firms_list.append(fi)
 
@@ -61,10 +64,20 @@ firm_dict = create_all_firms()
 create_postiton_names()
 
 people = list()
-for i in range(400):
+
+# инициируем людей
+for i in range(INITIAL_PEOPLE_NUMBER):
     people.append(Human(session))
 session.add_all(people)
 session.commit()
+
+# дополнительно инициируем те опции, котоыре нельзя инициироватль сразу, потому что записи
+# о человеке в базу не внесены
+for i in people:
+    i.assign()
+session.add_all(people)
+session.commit()
+
 
 for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     time_pass()

@@ -4,6 +4,7 @@ from names import firm_names, first_name, second_name, last_name
 
 SIM_YEARS = .1
 YEAR_LENGTH = 365
+INITIAL_PEOPLE_NUMBER = 100
 
 # количество фирм
 COL_FIRM = len(firm_names)
@@ -27,7 +28,7 @@ def get_rand_firm_id() -> int:
     return (randint(1, COL_FIRM))
 
 # возвращает дату рождения
-def get_birthday()->date:
+def get_birthday() -> date:
     add_days = randint(0, BIRTH_RANGE)
     bd = OLDEST_BIRTH_DATE + timedelta(days=add_days)
     return bd

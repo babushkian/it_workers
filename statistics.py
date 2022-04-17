@@ -1,16 +1,14 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import func, asc, desc, distinct
+from sqlalchemy.sql import func, distinct
+from datetime import date
 
-from settings import SIM_YEARS, time_pass
-from worker_base import (Base,
-                        Position,
-                        PosBase,
-                        Firm,
-                        Human,
-                        HumanFirm
-                         )
+from model.worker_base import (PosBase,
+                               Firm,
+                               HumanFirm
+                               )
+from model.human import Human
 
 
 @event.listens_for(Engine, "connect")
@@ -64,3 +62,9 @@ x = x.all()
 print(x)
 for i in x:
     print(f'{i.human_id:3d}  {i.move_to_firm_date}  {i.firm_id:3d}  {i.name}')
+
+x = session.query(Human).filter(Human.birth_date < date(1970, 1,1)).order_by(Human.birth_date)
+print(x)
+x = x.all()
+for i in x:
+    print(i)
