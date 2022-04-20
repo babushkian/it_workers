@@ -2,9 +2,10 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func, distinct
-from datetime import date
+from datetime import date, datetime
 
 from model.worker_base import (PosBase,
+                               LastSimDate,
                                Firm,
                                HumanFirm, HumanPosition
                                )
@@ -63,11 +64,16 @@ print(x)
 for i in x:
     print(f'{i.human_id:3d}  {i.move_to_firm_date}  {i.firm_id:3d}  {i.name}')
 
-x = session.query(Human).filter(Human.birth_date < date(1970, 1,1)).order_by(Human.birth_date)
+print('-----------------------------')
+print('Список людей родившихся с 1970 года')
+print('-----------------------------')
+lsd = session.query(LastSimDate.date).scalar()
+x = session.query(Human).filter(Human.birth_date > date(1970, 1,1)).order_by(Human.birth_date)
 print(x)
 x = x.all()
 for i in x:
-    print(i)
+    exp = (lsd - i.start_work).days if  i.start_work is not None else 0
+    print(i, 'опыт:', exp)
 
 print('-----------------------------')
 x = session.query(HumanPosition).filter(HumanPosition.human_id==6).order_by(HumanPosition.move_to_position_date).all()

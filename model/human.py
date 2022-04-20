@@ -9,7 +9,8 @@ from model.worker_base import (Base,
                                Position,
                                HumanPosition,
                                HumanFirm,
-                               Firm)
+                               Firm,
+                               LastSimDate)
 from settings import (get_birthday,
                       get_rand_firm_id,
                       get_anno,
@@ -35,6 +36,7 @@ class Human(Base):
     firm = relationship('Firm', backref='humans')
     position = relationship('HumanPosition', backref='humans')
     position_name = relationship('PosBase', backref='humans')
+
 
     # дата начала работы
     # стаж. От него зависит вероятность продвижения по карьерной лестнице
@@ -175,5 +177,5 @@ class Human(Base):
 
     def __repr__(self):
         s = f'id: {self.id} {self.lname} {self.fname} {self.sname}, {self.birth_date}, талант:{self.talent} \
-        фирма: "{self.firm.name}" долж:{self.position_name.name}, стаж: {self.experience}'
+        фирма: "{self.firm.name}" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
         return s

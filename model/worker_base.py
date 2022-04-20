@@ -11,6 +11,7 @@ from settings import (get_anno, YEAR_LENGTH)
 
 Base = declarative_base()
 
+
 class Position():
     PROGRESSION = 2  # основание степени (тружность получения повышения растет по степенному закону в завистмости от должности)
 
@@ -58,6 +59,11 @@ class Position():
 
     def demotion(self):  # понижние по службе
         pass
+
+class LastSimDate(Base):
+    __tablename__ = 'last_sim_date'
+    id = Column(Integer, primary_key=True)
+    date = Column(Date, default= get_anno(), onupdate=get_anno())
 
 
 class PosBase(Base):

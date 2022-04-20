@@ -11,7 +11,7 @@ from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
                         INITIAL_PEOPLE_NUMBER
                       )
 from model.worker_base import (Base,
-                               Position,
+                               LastSimDate,
                                PosBase,
                                Firm,
                                )
@@ -80,9 +80,13 @@ def people_init():
 firm_dict = create_all_firms()
 create_postiton_names()
 people = people_init()
+lsd = LastSimDate()
+session.add(lsd)
+session.commit()
 
 for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     time_pass()
+    lsd.date = settings.get_anno()
     for f in firm_dict.values():
         f.update()
     for p in people:
