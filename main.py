@@ -58,7 +58,7 @@ def create_all_firms() -> dict[int, Firm]:
 
 
 def create_postiton_names():
-    for i in Position.POSITIONS:
+    for i in settings.position_names:
         session.add(PosBase(name = i))
     session.commit()
 

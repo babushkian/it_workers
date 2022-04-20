@@ -13,9 +13,8 @@ Base = declarative_base()
 
 class Position():
     PROGRESSION = 2  # основание степени (тружность получения повышения растет по степенному закону в завистмости от должности)
-    POSITIONS = ['безработный', 'стажёр', 'инженер', 'старший инженер', 'главный инженер', 'начальник отдела',
-                 'начальник департамента', 'директор']
-    CAP = len(POSITIONS) - 1
+
+    CAP = len(settings.position_names) - 1
 
     def __init__(self, ses, human):
         self.session = ses

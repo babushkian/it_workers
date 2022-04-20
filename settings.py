@@ -1,8 +1,8 @@
 from random import  randint
 from datetime import datetime, date, timedelta
-from names import firm_names, first_name, second_name, last_name
+from names import firm_names, first_name, second_name, last_name, position_names
 
-SIM_YEARS = 3.1
+SIM_YEARS = .1
 YEAR_LENGTH = 365
 INITIAL_PEOPLE_NUMBER = 100
 
