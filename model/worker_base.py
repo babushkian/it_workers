@@ -25,6 +25,10 @@ class Position():
     def position(self):
         return self.__position
 
+    def become_worker(self):
+        # при начале работы надо сменить позицию с безработного на работника
+        self.__position = 2
+
     @property
     def posname(self):
         pos = self.session.query(PosBase.name).filter(PosBase.id == self.__position).scalar()

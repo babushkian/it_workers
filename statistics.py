@@ -6,7 +6,7 @@ from datetime import date
 
 from model.worker_base import (PosBase,
                                Firm,
-                               HumanFirm
+                               HumanFirm, HumanPosition
                                )
 from model.human import Human
 
@@ -68,3 +68,16 @@ print(x)
 x = x.all()
 for i in x:
     print(i)
+
+print('-----------------------------')
+x = session.query(HumanPosition).filter(HumanPosition.human_id==6).order_by(HumanPosition.move_to_position_date).all()
+for i in x:
+    print(i.pos_id, i.move_to_position_date)
+
+print('-----------------------------')
+print('Даты повышения человека')
+print('Достаются через отношения')
+h=session.query(Human).filter(Human.id == 2).one()
+print(h)
+for i in h.position:
+    print(i.pos_id, i.move_to_position_date)

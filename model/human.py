@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, date
 from random import choice, randint, random
 
 from sqlalchemy import Column, Integer, String, Date, ForeignKey
@@ -33,7 +33,8 @@ class Human(Base):
     death_date = Column(Date, index=True)
     retire_date = Column(Date, index=True)
     firm = relationship('Firm', backref='humans')
-    position = relationship('PosBase', backref='humans')
+    position = relationship('HumanPosition', backref='humans')
+    position_name = relationship('PosBase', backref='humans')
 
     # дата начала работы
     # стаж. От него зависит вероятность продвижения по карьерной лестнице
@@ -48,9 +49,9 @@ class Human(Base):
         self.birth_date = get_birthday()  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
-        self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
-        self.pos_id = self.pos.position
-        self.firm_id = get_rand_firm_id()
+        # self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
+        # self.pos_id = self.pos.position
+        # self.firm_id = get_rand_firm_id()
 
 
     def assign(self):
@@ -58,10 +59,22 @@ class Human(Base):
         при инициации нужно присвоить человеку какую-то должность. Делает ся это через таблицу human_positions
         но из инита Human сделать запись в нее нельзя, та как у Human  в этот момент еще не определен id
         '''
+        self.firm_id = get_rand_firm_id()
+        self.initial_check_start_work()
+        self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
         self.change_position()
-        self.check_start_work()
 
 
+    def initial_check_start_work(self):
+        # как только человеку исполняется 20 лет, он начинает работать
+        y = self.birth_date.year + 20
+        anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
+        if anniversary_20 <= get_anno():
+            self.start_work =  anniversary_20
+            # определили, что человек работает
+            # а раз работает, сразу делаем запись что с сегодняшнего для он трудоустроен
+            # в фирме, айдишник которой выпал при первоначальной генерации
+            self.migrate_record()
 
     def check_start_work(self):
         if self.start_work is None:
@@ -70,8 +83,10 @@ class Human(Base):
                 return False
             else:
                 # если человеку больше 19 лет иначе он не работает
-                self.start_work =  self.birth_date + timedelta(days=366*20)
-                self.migrate_record()
+                self.start_work = get_anno()
+                self.pos.become_worker() # повышаем с безработного жо первой ступени работника
+                self.change_position() # делаем запись о смене позиции
+                self.migrate_record() # делаем запись о начале работы в фирме
                 return True
         else:
             return True
@@ -145,6 +160,9 @@ class Human(Base):
         self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))
 
     def migrate(self):
+        '''
+        Переходим в другую фирму
+        '''
         targ = get_rand_firm_id()
         if self.firm_id != targ:
             targ_firm_rating = self.session.query(Firm.rating).filter(Firm.id == targ).scalar()
@@ -157,5 +175,5 @@ class Human(Base):
 
     def __repr__(self):
         s = f'id: {self.id} {self.lname} {self.fname} {self.sname}, {self.birth_date}, талант:{self.talent} \
-        фирма: "{self.firm.name}" долж:{self.position.name}, стаж: {self.experience}'
+        фирма: "{self.firm.name}" долж:{self.position_name.name}, стаж: {self.experience}'
         return s
