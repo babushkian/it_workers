@@ -2,7 +2,7 @@ from random import  randint
 from datetime import datetime, date, timedelta
 from names import firm_names, first_name, second_name, last_name, position_names
 
-SIM_YEARS = 3.1
+SIM_YEARS = 2.1
 YEAR_LENGTH = 365
 INITIAL_PEOPLE_NUMBER = 100
 
@@ -10,11 +10,11 @@ INITIAL_PEOPLE_NUMBER = 100
 COL_FIRM = len(firm_names)
 
 DEATH_MIN_AGE = 30
-DEATH_MAX_AGE = 100
+DEATH_MAX_AGE = 90
 DEATH_DELTA = DEATH_MAX_AGE - DEATH_MIN_AGE
 
-OLDEST_BIRTH_DATE = datetime(1950, 1, 1)
-YONGEST_BIRTH_DATE = datetime(1998, 1, 1)
+OLDEST_BIRTH_DATE = datetime(1945, 1, 1)
+YONGEST_BIRTH_DATE = datetime(1999, 1, 1)
 BIRTH_RANGE = (YONGEST_BIRTH_DATE - OLDEST_BIRTH_DATE).days
 
 

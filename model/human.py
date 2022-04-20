@@ -15,6 +15,7 @@ from settings import (get_birthday,
                       get_rand_firm_id,
                       get_anno,
                       RETIREMENT_MIN_AGE,
+                      RETIREMENT_DELTA,
                       DEATH_DELTA,
                       YEAR_LENGTH,
                       DEATH_MIN_AGE)
@@ -94,35 +95,34 @@ class Human(Base):
             return True
 
     def check_retirement(self):
-        if self.id > 87 and self.id < 90:
-            print(f'{self.id=} {self.age=} {get_anno().year - self.birth_date.year} {RETIREMENT_MIN_AGE=}')
-
-        if self.retire_date is None:
-            if self.age < RETIREMENT_MIN_AGE:
-                return False
-            else:
-                print('Old')
-                treshold = .1 + (self.age - RETIREMENT_MIN_AGE)/(DEATH_DELTA*YEAR_LENGTH)
-                print(self.age, treshold)
-                if random() < treshold:
-                    print('Retired')
-                    self.set_retired()
-                    return True
-        else:
+        if self.retire_date is not None:
             return True
+        elif self.age < RETIREMENT_MIN_AGE:
+                return False
+        else:
+            treshold =  (self.age + 1 - RETIREMENT_MIN_AGE)/(RETIREMENT_DELTA*YEAR_LENGTH)
+            if random() < treshold:
+                print('Retired')
+                self.set_retired()
+                return True
+            else:
+                return False
+
 
     def check_death(self):
-        if self.death_date is None:
-            if self.age < DEATH_MIN_AGE:
-                return False
-            else:
-                treshold = (self.age - DEATH_MIN_AGE)/(2*DEATH_DELTA*DEATH_DELTA*YEAR_LENGTH)
-                if random() < treshold:
-                    print('Dead')
-                    self.set_dead()
-                    return True
-        else:
+        if self.death_date is not  None: # уже умер
             return True
+        elif self.age < DEATH_MIN_AGE: # возраст слишком ранний для умирания
+            return False
+        else: # Есть возможность умереть
+            treshold = (self.age - DEATH_MIN_AGE)/(18*DEATH_DELTA*YEAR_LENGTH)
+            if random() < treshold: # повезло, умер
+                print('Dead')
+                self.set_dead()
+                return True
+            else:
+                return False
+
 
 
     def set_retired(self):
@@ -146,7 +146,7 @@ class Human(Base):
     def update(self):
         if self.check_death() is False:
             if self.check_retirement() is False:
-                if self.check_start_work() is True:
+                if self.check_start_work():
                     promoted = self.pos.promotion(self.talent, self.experience)
                     if promoted:
                         self.change_position()
