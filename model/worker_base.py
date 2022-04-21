@@ -97,13 +97,9 @@ class Firm(Base):
     name_id = Column(Integer, ForeignKey('firmnames.id'))
     rating = Column(Integer)
     open_date = Column(Date)
+    close_date = Column(Date)
     ratings = relationship('FirmRating', backref='firms')
     name = relationship('FirmName', backref='firms')
-
-    @classmethod
-    def bind_session(cls, session):
-        cls.session = session
-
 
     def __init__(self, n):
         self.name_id = n
@@ -111,12 +107,21 @@ class Firm(Base):
         self.open_date = get_anno()
 
     @classmethod
+    def bind_session(cls, session):
+        cls.session = session
+
+    @classmethod
+    def get_rand_firm_id(cls):
+        pool = cls.session.query(Firm.id).filter(Firm.close_date.is_(None)).all()
+        return choice(pool)[0]
+
+    @classmethod
     def get_used_firm_ids_pool(cls):
         pool = cls.session.query(FirmName.id).filter(FirmName.used==True).all()
         return pool
 
     @classmethod
-    def get_unused_firm_id(cls):
+    def get_unused_firmname_id(cls):
         pool = cls.session.query(FirmName.id).filter(FirmName.used==False).all()
         assert len(pool) > 0, 'нет свободных названий фирм'
         new_id = choice(pool)[0]

@@ -41,8 +41,8 @@ session = Session()
 Base.metadata.create_all(engine)
 
 def create_firm() -> Firm:
-    firm_id = Firm.get_unused_firm_id()
-    fi = Firm(firm_id)
+    firm_name_id = Firm.get_unused_firmname_id()
+    fi = Firm(firm_name_id)
     session.add(fi)
     session.flush()
     fi.assign()
@@ -80,6 +80,7 @@ def people_init():
         people.append(Human(session))
     session.add_all(people)
     session.flush()
+    session.commit()
     for hum in people:
         hum.assign()
     session.commit()
@@ -107,10 +108,8 @@ for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     for p in people:
         p.update()
 
-    if random.random() < (1/50):
-        print("создана новая фирма")
-        firm_pool = Firm.get_used_firm_ids_pool()
-        print(firm_pool)
+    if random.random() < (1/240):
+        print('создана новая фирма')
         firm_list.append(create_firm())
     session.commit()
 

@@ -58,13 +58,16 @@ class Human(Base):
         при инициации нужно присвоить человеку какую-то должность. Делает ся это через таблицу human_positions
         но из инита Human сделать запись в нее нельзя, та как у Human  в этот момент еще не определен id
         '''
-        self.firm_id = self.get_rand_firm_id()
+        a = Firm.get_rand_firm_id()
+        print(a)
+        self.firm_id = a
+
         self.initial_check_start_work()
         self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
         self.change_position()
 
-    def get_rand_firm_id(self):
-        pass
+
+
 
     def initial_check_start_work(self):
         # как только человеку исполняется 20 лет, он начинает работать
@@ -164,7 +167,7 @@ class Human(Base):
         '''
         Переходим в другую фирму
         '''
-        targ = self.get_rand_firm_id()
+        targ = Firm.get_rand_firm_id()
         if self.firm_id != targ:
             targ_firm_rating = self.session.query(Firm.rating).filter(Firm.id == targ).scalar()
             attraction_mod = targ_firm_rating - self.firm.rating
