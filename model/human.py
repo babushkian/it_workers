@@ -12,7 +12,6 @@ from model.worker_base import (Base,
                                Firm,
                                LastSimDate)
 from settings import (get_birthday,
-                      get_rand_firm_id,
                       get_anno,
                       RETIREMENT_MIN_AGE,
                       RETIREMENT_DELTA,
@@ -52,9 +51,6 @@ class Human(Base):
         self.birth_date = get_birthday()  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
-        # self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
-        # self.pos_id = self.pos.position
-        # self.firm_id = get_rand_firm_id()
 
 
     def assign(self):
@@ -62,11 +58,13 @@ class Human(Base):
         при инициации нужно присвоить человеку какую-то должность. Делает ся это через таблицу human_positions
         но из инита Human сделать запись в нее нельзя, та как у Human  в этот момент еще не определен id
         '''
-        self.firm_id = get_rand_firm_id()
+        self.firm_id = self.get_rand_firm_id()
         self.initial_check_start_work()
         self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
         self.change_position()
 
+    def get_rand_firm_id(self):
+        pass
 
     def initial_check_start_work(self):
         # как только человеку исполняется 20 лет, он начинает работать
@@ -166,7 +164,7 @@ class Human(Base):
         '''
         Переходим в другую фирму
         '''
-        targ = get_rand_firm_id()
+        targ = self.get_rand_firm_id()
         if self.firm_id != targ:
             targ_firm_rating = self.session.query(Firm.rating).filter(Firm.id == targ).scalar()
             attraction_mod = targ_firm_rating - self.firm.rating

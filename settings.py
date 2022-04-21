@@ -5,6 +5,7 @@ from names import firm_names, first_name, second_name, last_name, position_names
 SIM_YEARS = 1.1
 YEAR_LENGTH = 365
 INITIAL_PEOPLE_NUMBER = 100
+INITIAL_FIRM_NUMBER = 6
 
 # количество фирм
 COL_FIRM = len(firm_names)
@@ -21,11 +22,6 @@ BIRTH_RANGE = (YONGEST_BIRTH_DATE - OLDEST_BIRTH_DATE).days
 RETIREMENT_MIN_AGE = 60
 RETIREMENT_MAX_AGE = 80
 RETIREMENT_DELTA = RETIREMENT_MAX_AGE - RETIREMENT_MIN_AGE
-
-
-# возвращает индекс случайной фирмы
-def get_rand_firm_id() -> int:
-    return (randint(1, COL_FIRM))
 
 # возвращает дату рождения
 def get_birthday() -> date:

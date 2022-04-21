@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String,  Date,  ForeignKey, Index
+from sqlalchemy import Column, Integer, String,  Date, Boolean,  ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 
-from random import randint, random
+from random import randint, random, choice
 
 from sqlalchemy.orm import relationship
 
@@ -91,22 +91,44 @@ class HumanPosition(Base):
 
 
 class Firm(Base):
+    session = None
     __tablename__ = 'firms'
     id = Column(Integer, primary_key=True)
-    name = Column(String(70))
+    name_id = Column(Integer, ForeignKey('firmnames.id'))
     rating = Column(Integer)
     open_date = Column(Date)
     ratings = relationship('FirmRating', backref='firms')
+    name = relationship('FirmName', backref='firms')
+
+    @classmethod
+    def bind_session(cls, session):
+        cls.session = session
 
 
-    def __init__(self, ses, name):
-        self.session = ses
-        self.name = name
+    def __init__(self, n):
+        self.name_id = n
         self.rating = self.new_rating()
         self.open_date = get_anno()
 
+    @classmethod
+    def get_used_firm_ids_pool(cls):
+        pool = cls.session.query(FirmName.id).filter(FirmName.used==True).all()
+        return pool
+
+    @classmethod
+    def get_unused_firm_id(cls):
+        pool = cls.session.query(FirmName.id).filter(FirmName.used==False).all()
+        assert len(pool) > 0, 'нет свободных названий фирм'
+        new_id = choice(pool)[0]
+        cls.mark_firmname_as_used(new_id)
+        return new_id
+
+    @classmethod
+    def mark_firmname_as_used(cls, new_id):
+        cls.session.query(FirmName).filter(FirmName.id == new_id).update({'used':True})
+
     def assign(self):
-        self.session.add(FirmRating(firm=self.id, rating=self.rating, rdate=get_anno()))
+        Firm.session.add(FirmRating(firm=self.id, rating=self.rating, rdate=get_anno()))
 
 
     def update(self):
@@ -124,6 +146,11 @@ class Firm(Base):
     def __repr__(self):
         return f'<id:{self.id} "{self.name}"  рейтинг: {self.rating}>'
 
+class FirmName(Base):
+    __tablename__ = 'firmnames'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(70))
+    used = Column(Boolean, default=False)
 
 class FirmRating(Base):
     __tablename__ = 'firm_ratings'
