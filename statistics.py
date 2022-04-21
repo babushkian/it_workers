@@ -1,15 +1,16 @@
+from datetime import date
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func, distinct
-from datetime import date, datetime
 
+from model.human import Human
 from model.worker_base import (PosBase,
                                LastSimDate,
                                Firm,
                                HumanFirm, HumanPosition
                                )
-from model.human import Human
 
 
 @event.listens_for(Engine, "connect")
@@ -87,3 +88,45 @@ h=session.query(Human).filter(Human.id == 2).one()
 print(h)
 for i in h.position:
     print(i.pos_id, i.move_to_position_date)
+
+
+print('-----------------------------')
+print('Вышедших на пенсию:', session.query(func.count(Human.retire_date)).scalar())
+print('Умерших:', session.query(func.count(Human.death_date)).scalar())
+print('')
+
+print("Умерших после выхода на пенсию")
+x = session.query(func.count(Human.id)).filter(Human.retire_date != Human.death_date).scalar()
+print(x)
+x = session.query(Human.id, Human.retire_date, Human.death_date).filter(Human.retire_date < Human.death_date).all()
+for i in x:
+    print(f'{i.id:4d}  {i.retire_date} -- {i.death_date}')
+
+def age(birth, event):
+    age = event.year - birth.year - ((event.month, event.day) < (birth.month, birth.day))
+    return age
+
+
+pens = session.query(Human.retire_date,Human.birth_date ).filter(Human.retire_date.is_not(None), Human.retire_date !=Human.death_date)
+print(pens)
+pens = pens.all()
+print('Количество пенсионеров, вышедших на пенсию до смерти: ', len(pens))
+rsum = 0
+for i in pens:
+    a = age(i.birth_date, i.retire_date)
+    rsum += a
+
+
+
+print('Средний возраст выхода на пенсию ', (rsum/len(pens) if len(pens) >0 else 0))
+
+deaths = session.query(Human.death_date,Human.birth_date ).filter(Human.death_date.is_not(None))
+
+deaths = deaths.all()
+
+dsum = 0
+for i in deaths:
+    a = age(i.birth_date, i.death_date)
+    dsum += a
+
+print('Средний возраст смерти ', (dsum/len(deaths) if len(deaths) >0 else 0))

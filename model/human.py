@@ -130,7 +130,8 @@ class Human(Base):
 
     def set_dead(self):
         self.death_date = get_anno()
-        self.set_retired()
+        if self.retire_date is None:
+            self.set_retired()
 
     @property
     def age(self):
