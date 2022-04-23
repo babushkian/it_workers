@@ -20,20 +20,22 @@ from settings import (get_birthday,
                       DEATH_MIN_AGE)
 
 
-class Human(Base):
+class People(Base):
     __tablename__ = 'humans'
     id = Column(Integer, primary_key=True)
-    fname = Column(String(50))
-    sname = Column(String(50))
-    lname = Column(String(50))
+    first_name = Column(String(50))
+    second_name = Column(String(50))
+    last_name = Column(String(50))
     birth_date = Column(Date, index=True)
     talent = Column(Integer, index=True)
     start_work = Column(Date)
-    firm_id = Column(Integer, ForeignKey('firms.id'), index=True)
-    pos_id = Column(Integer, ForeignKey('positions.id'), index=True)
+    last_firm_id = Column(Integer, ForeignKey('firms.id'), index=True)
+    last_position_id = Column(Integer, ForeignKey('positions.id'), index=True)
     death_date = Column(Date, index=True)
     retire_date = Column(Date, index=True)
     firm = relationship('Firm', backref='humans')
+    worked_in_firms = relationship('Firm', secondary='people_firms' )
+
     position = relationship('HumanPosition', backref='humans')
     position_name = relationship('PosBase', backref='humans')
 
@@ -45,9 +47,9 @@ class Human(Base):
 
     def __init__(self, ses):
         self.session = ses
-        self.fname = choice(settings.first_name)  #
-        self.sname = choice(settings.second_name)  #
-        self.lname = choice(settings.last_name)  #
+        self.first_name = choice(settings.first_name)  #
+        self.second_name = choice(settings.second_name)  #
+        self.last_name = choice(settings.last_name)  #
         self.birth_date = get_birthday()  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
@@ -56,11 +58,9 @@ class Human(Base):
     def assign(self):
         '''
         при инициации нужно присвоить человеку какую-то должность. Делает ся это через таблицу human_positions
-        но из инита Human сделать запись в нее нельзя, та как у Human  в этот момент еще не определен id
+        но из инита People сделать запись в нее нельзя, та как у People  в этот момент еще не определен id
         '''
-        a = Firm.get_rand_firm_id()
-        print(a)
-        self.firm_id = a
+        self.last_firm_id = Firm.get_rand_firm_id()
 
         self.initial_check_start_work()
         self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
@@ -157,27 +157,27 @@ class Human(Base):
                         self.migrate_record()
 
     def change_position(self):
-        self.pos_id = self.pos.position
-        self.session.add(HumanPosition(human_id=self.id, pos_id=self.pos_id, move_to_position_date=get_anno()))
+        self.last_position_id = self.pos.position
+        self.session.add(HumanPosition(people_id=self.id, position_id=self.last_position_id, move_to_position_date=get_anno()))
 
     def migrate_record(self):
-        self.session.add(HumanFirm(human_id=self.id, firm_id=self.firm_id, move_to_firm_date=get_anno()))
+        self.session.add(HumanFirm(people_id=self.id, firm_id=self.last_firm_id, move_to_firm_date=get_anno()))
 
     def migrate(self):
         '''
         Переходим в другую фирму
         '''
         targ = Firm.get_rand_firm_id()
-        if self.firm_id != targ:
-            targ_firm_rating = self.session.query(Firm.rating).filter(Firm.id == targ).scalar()
-            attraction_mod = targ_firm_rating - self.firm.rating
+        if self.last_firm_id != targ:
+            targ_firm_rating = self.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
+            attraction_mod = targ_firm_rating - self.firm.last_rating
             chanse = (40 + attraction_mod) / (40 * 365)
             if random() < chanse:
-                self.firm_id = targ
+                self.last_firm_id = targ
                 return True
         return False
 
     def __repr__(self):
-        s = f'id: {self.id} {self.lname} {self.fname} {self.sname}, {self.birth_date}, талант:{self.talent} \
-        фирма: "{self.firm.name}" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
+        s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date}, талант:{self.talent} \
+        фирма: "{self.firm.firmname.name}" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
         return s

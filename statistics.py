@@ -2,14 +2,14 @@ from datetime import date
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import func, distinct
-
-from model.human import Human
+from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy.sql import func, distinct, exists
+from pathlib import Path
+from model.human import People
 from model.worker_base import (PosBase,
                                LastSimDate,
                                Firm,
-                               HumanFirm, HumanPosition
+                               HumanFirm, HumanPosition, FirmName
                                )
 
 
@@ -21,58 +21,135 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.execute("PRAGMA foreign_keys = ON")
     cursor.close()
 
-engine = create_engine(f"sqlite:///workers.db", echo=False)
+basefile = 'mega_workers.db'
+if Path(basefile).exists() == False:
+    basefile ='workers.db'
+
+engine = create_engine(f"sqlite:///{basefile}", echo=True)
 Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
 
-all_rec = session.query(Human).count()
-print(f'Всего записей: {all_rec}')
+def all_people_count():
+    all_rec = session.query(People).count()
+    '''
+    SELECT count(*) AS count_1
+    FROM (SELECT humans.id AS humans_id, humans.first_name AS humans_fname, humans.second_name AS humans_sname, humans.last_name AS humans_lname, humans.birth_date AS humans_birth_date, humans.talent AS humans_talent, humans.start_work AS humans_start_work, humans.last_firm_id AS humans_firm_id, humans.position_id AS humans_pos_id, humans.death_date AS humans_death_date, humans.retire_date AS humans_retire_date 
+    FROM humans) AS anon_1
+    '''
+    print(f'Всего записей: {all_rec}')
+    all_rec = session.query(func.count(People.id)).scalar()
+    '''
+    SELECT count(humans.id) AS count_1 
+    FROM humans
+    '''
+    print(f'Количество записей, вычисленное другим способом, более быстрым: {all_rec}')
 
 
-# средняя квалификация по всем людям
-print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
-mean_pos = session.query(func.sum(Human.pos_id).label('p_sum'),func.count(Human.pos_id).label('p_count')).one()
-print(mean_pos)
+def mean_qualification():
+    # средняя квалификация по всем людям
+    print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
+    mean_pos = session.query(func.sum(People.last_position_id).label('p_sum'), func.count(People.last_position_id).label('p_count')).one()
+    print(mean_pos)
+    print(f"Среняя квалификация людей: {mean_pos.p_sum / mean_pos.p_count}")
 
-print(f"Среняя квалификация людей: {mean_pos.p_sum / mean_pos.p_count}")
+def talent_mean_qualification():
+    # средняя квалификация в зависимости от таланта
+    p_tal = session.query(func.sum(People.last_position_id).label('tal_sum'), func.count(People.talent).label('tal_count'), People.talent)\
+        .group_by(People.talent).order_by(People.talent).all()
+    print('средняя квалификация в зависимости от таланта')
+    for i in p_tal:
+        print(i.talent, i.tal_sum/i.tal_count)
+
+def real_positions():
+    # выборка имеющихся должностей
+    print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
+    psd = session.query(distinct(People.last_position_id)).order_by(People.last_position_id).all()
+    print(psd)
+
+def positions_distribution():
+    # РАСПРЕДЕЛЕНИЕ ЛЮДЕЙ ПО ДОЛЖНОСТЯМ
+    print('*' * 40, '\nРаспределение должностей среди людей')
+    x = (session.query(func.count(People.id).label('cont'), PosBase.name).join(PosBase)
+        .group_by(People.last_position_id).order_by(People.last_position_id).all()
+         )
+    for y in x:
+        print(y.cont, y.name)
 
 
-# средняя квалификация в зависимости от таланта
-p_tal = session.query(func.sum(Human.pos_id).label('tal_sum'), func.count(Human.talent).label('tal_count'), Human.talent)\
-    .group_by(Human.talent).order_by(Human.talent).all()
-print('средняя квалификация в зависимости от таланта')
-for i in p_tal:
-    print(i.talent, i.tal_sum/i.tal_count)
+def real_firm_names():
+    print('-----------------------------')
+    print('Названия имеющихся фирм')
+    print('-----------------------------')
+    x = session.query(Firm).options(joinedload('firmname'),).all()
+    for i in x:
+        print(i.firmname.name)
 
-# выборка имеющихся должностей
-print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
-psd = session.query(distinct(Human.pos_id)).order_by(Human.pos_id).all()
-print(psd)
+def born_after_X_year():
+    x= session.query(exists().where(People.birth_date >= date(1995, 1, 1))).scalar()
+    print('-----------------------------')
+    print('имеются ли люди младше 1994 года', x)
 
-# РАСПРЕДЕЛЕНИЕ ЛЮДЕЙ ПО ДОЛЖНОСТЯМ
-# первый способ
-print('*' * 40, '\nРаспределение должностей среди людей')
-x = session.query(func.count(Human.id).label('cont'), PosBase.name).join(PosBase).group_by(Human.pos_id).order_by(
-    Human.pos_id).all()
-for y in x:
-    print(y.cont, y.name)
+def people_from_firm_X():
+    print('-----------------------------')
+    print('Все люди, последним местом работы которых была фирма с id=1')
+    print('-----------------------------')
+    x= session.query(People).options(joinedload('firm')).filter(Firm.id == 1).all()
+    for i in x:
+        print(i)
 
-x = (session.query(HumanFirm.human_id, HumanFirm.move_to_firm_date, HumanFirm.firm_id, Firm.name)
-     .join(Firm)
-     .filter(HumanFirm.human_id<11)
-     .order_by(HumanFirm.human_id, HumanFirm.move_to_firm_date))
+
+
+
+# x = (session.query(HumanFirm.people_id, HumanFirm.move_to_firm_date, HumanFirm.last_firm_id, Firm.name)
+#      .join(Firm)
+#      .filter(HumanFirm.people_id<11)
+#      .order_by(HumanFirm.people_id, HumanFirm.move_to_firm_date)
+#      )
+print('-----------------------------')
+print('Фирмы, в которых работают люди с id<11')
+# сначала выделяем список идентификаторов всех фирм в которых работают выбранные люди
+y = (session.query( HumanFirm.firm_id)
+     .filter(HumanFirm.people_id < 11)
+     .order_by(HumanFirm.people_id)
+     )
+# затем по нужным идентификаторам фирм получаем записи фирм
+x = session.query(Firm).options(joinedload('firmname')).filter(Firm.id.in_(y)).all()
+'''
+ELECT firms.id AS firms_id, firms.firmname_id AS firms_firmname_id, firms.last_rating AS firms_last_rating, firms.open_date AS firms_open_date, firms.close_date AS firms_close_date, firmnames_1.id AS firmnames_1_id, firmnames_1.name AS firmnames_1_name, firmnames_1.used AS firmnames_1_used 
+FROM firms 
+LEFT OUTER JOIN firmnames AS firmnames_1 ON firmnames_1.id = firms.firmname_id 
+WHERE firms.id IN (
+    SELECT people_firms.firm_id 
+    FROM people_firms 
+    WHERE people_firms.people_id < 11 ORDER BY people_firms.people_id
+    )
+'''
+
+print(y)
+for i in x:
+    print(i)
+
+'''
+y = session.query(Firm).join(FirmName)
+print(y)
+x = (session.query(HumanFirm.people_id, HumanFirm.move_to_firm_date, HumanFirm.last_firm_id, Firm.firmname_id, FirmName.name)
+     .join(y)
+     .filter(HumanFirm.people_id<11)
+     .order_by(HumanFirm.people_id, HumanFirm.move_to_firm_date))
 print(x)
 x = x.all()
 print(x)
 for i in x:
-    print(f'{i.human_id:3d}  {i.move_to_firm_date}  {i.firm_id:3d}  {i.name}')
+    print(f'{i.people_id:3d}  {i.move_to_firm_date}  {i.last_firm_id:3d}  {i.firmname_id}')
+'''
 
+'''
 print('-----------------------------')
 print('Список людей родившихся с 1970 года')
 print('-----------------------------')
 lsd = session.query(LastSimDate.date).scalar()
-x = session.query(Human).filter(Human.birth_date > date(1970, 1,1)).order_by(Human.birth_date)
+x = session.query(People).filter(People.birth_date > date(1970, 1,1)).order_by(People.birth_date)
 print(x)
 x = x.all()
 for i in x:
@@ -80,28 +157,28 @@ for i in x:
     print(i, 'опыт:', exp)
 
 print('-----------------------------')
-x = session.query(HumanPosition).filter(HumanPosition.human_id==6).order_by(HumanPosition.move_to_position_date).all()
+x = session.query(HumanPosition).filter(HumanPosition.people_id==6).order_by(HumanPosition.move_to_position_date).all()
 for i in x:
-    print(i.pos_id, i.move_to_position_date)
+    print(i.position_id, i.move_to_position_date)
 
 print('-----------------------------')
 print('Даты повышения человека')
 print('Достаются через отношения')
-h=session.query(Human).filter(Human.id == 2).one()
+h=session.query(People).filter(People.id == 2).one()
 print(h)
 for i in h.position:
-    print(i.pos_id, i.move_to_position_date)
+    print(i.position_id, i.move_to_position_date)
 
 
 print('-----------------------------')
-print('Вышедших на пенсию:', session.query(func.count(Human.retire_date)).scalar())
-print('Умерших:', session.query(func.count(Human.death_date)).scalar())
+print('Вышедших на пенсию:', session.query(func.count(People.retire_date)).scalar())
+print('Умерших:', session.query(func.count(People.death_date)).scalar())
 print('')
 
 print("Умерших после выхода на пенсию")
-x = session.query(func.count(Human.id)).filter(Human.retire_date != Human.death_date).scalar()
+x = session.query(func.count(People.id)).filter(People.retire_date != People.death_date).scalar()
 print(x)
-x = session.query(Human.id, Human.retire_date, Human.death_date).filter(Human.retire_date < Human.death_date).all()
+x = session.query(People.id, People.retire_date, People.death_date).filter(People.retire_date < People.death_date).all()
 for i in x:
     print(f'{i.id:4d}  {i.retire_date} -- {i.death_date}')
 
@@ -110,7 +187,7 @@ def age(birth, event):
     return age
 
 
-pens = session.query(Human.retire_date,Human.birth_date ).filter(Human.retire_date.is_not(None), Human.retire_date !=Human.death_date)
+pens = session.query(People.retire_date,People.birth_date ).filter(People.retire_date.is_not(None), People.retire_date !=People.death_date)
 print(pens)
 pens = pens.all()
 print('Количество пенсионеров, вышедших на пенсию до смерти: ', len(pens))
@@ -123,7 +200,7 @@ for i in pens:
 
 print('Средний возраст выхода на пенсию ', (rsum/len(pens) if len(pens) >0 else 0))
 
-deaths = session.query(Human.death_date,Human.birth_date ).filter(Human.death_date.is_not(None))
+deaths = session.query(People.death_date,People.birth_date ).filter(People.death_date.is_not(None))
 
 deaths = deaths.all()
 
@@ -133,3 +210,4 @@ for i in deaths:
     dsum += a
 
 print('Средний возраст смерти ', (dsum/len(deaths) if len(deaths) >0 else 0))
+'''

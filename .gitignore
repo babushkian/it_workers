@@ -6,3 +6,4 @@ sim_*
 .idea
 *workers.db
 old
+/it_workers.sql

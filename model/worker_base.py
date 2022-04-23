@@ -9,6 +9,7 @@ import settings
 from settings import (get_anno, YEAR_LENGTH)
 
 
+
 Base = declarative_base()
 
 
@@ -73,37 +74,38 @@ class PosBase(Base):
 
 
 class HumanFirm(Base):
-    __tablename__ = 'human_firms'
+    __tablename__ = 'people_firms'
     id = Column(Integer, primary_key=True)
-    human_id = Column(Integer, ForeignKey('humans.id'))
+    people_id = Column(Integer, ForeignKey('humans.id'))
     firm_id = Column(Integer, ForeignKey('firms.id'))
     move_to_firm_date = Column(Date, index=True)
-    __table_args__ = (Index('ix_human_firms_human_id_firm_id', human_id, firm_id),)
+    __table_args__ = (Index('ix_human_firms_human_id_firm_id', people_id, firm_id),)
 
 
 class HumanPosition(Base):
     __tablename__ = 'human_positions'
     id = Column(Integer, primary_key=True)
-    human_id = Column(Integer, ForeignKey('humans.id'))
-    pos_id = Column(Integer, ForeignKey('positions.id'))
+    people_id = Column(Integer, ForeignKey('humans.id'))
+    position_id = Column(Integer, ForeignKey('positions.id'))
     move_to_position_date = Column(Date, index=True)
-    __table_args__ = (Index('ix_human_positions_human_id_pos_id', human_id, pos_id),)
+    __table_args__ = (Index('ix_human_positions_human_id_pos_id', people_id, position_id),)
 
 
 class Firm(Base):
     session = None
     __tablename__ = 'firms'
     id = Column(Integer, primary_key=True)
-    name_id = Column(Integer, ForeignKey('firmnames.id'))
-    rating = Column(Integer)
+    firmname_id = Column(Integer, ForeignKey('firmnames.id'))
+    last_rating = Column(Integer)
     open_date = Column(Date)
     close_date = Column(Date)
     ratings = relationship('FirmRating', backref='firms')
-    name = relationship('FirmName', backref='firms')
+    firmname = relationship('FirmName', uselist=False, back_populates="firm", innerjoin=True)
+    #people = relationship('People', secondary='human_firms')
 
     def __init__(self, n):
-        self.name_id = n
-        self.rating = self.new_rating()
+        self.firmname_id = n
+        self.last_rating = self.new_rating()
         self.open_date = get_anno()
 
     @classmethod
@@ -133,7 +135,7 @@ class Firm(Base):
         cls.session.query(FirmName).filter(FirmName.id == new_id).update({'used':True})
 
     def assign(self):
-        Firm.session.add(FirmRating(firm=self.id, rating=self.rating, rdate=get_anno()))
+        Firm.session.add(FirmRating(firm=self.id, rating=self.last_rating, rdate=get_anno()))
 
 
     def update(self):
@@ -144,18 +146,19 @@ class Firm(Base):
         return randint(10, 40)
 
     def update_rating(self):
-        r = self.rating + randint(-4, 4)
-        self.rating = max(0, r)
+        r = self.last_rating + randint(-4, 4)
+        self.last_rating = max(0, r)
         self.assign()
 
     def __repr__(self):
-        return f'<id:{self.id} "{self.name}"  рейтинг: {self.rating}>'
+        return f'<id:{self.id} "{self.firmname.name}"  рейтинг: {self.last_rating}>'
 
 class FirmName(Base):
     __tablename__ = 'firmnames'
     id = Column(Integer, primary_key=True)
     name = Column(String(70))
     used = Column(Boolean, default=False)
+    firm = relationship('Firm', uselist=False, back_populates='firmname')
 
 class FirmRating(Base):
     __tablename__ = 'firm_ratings'

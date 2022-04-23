@@ -5,7 +5,6 @@ import random
 random.seed(666)
 
 
-
 import settings
 from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
                         INITIAL_PEOPLE_NUMBER,
@@ -16,7 +15,7 @@ from model.worker_base import (Base,
                                PosBase,
                                Firm, FirmName,
                                )
-from model.human import Human
+from model.human import People
 
 
 @event.listens_for(Engine, "connect")
@@ -26,6 +25,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.execute("PRAGMA synchronous = OFF")
     cursor.execute("PRAGMA foreign_keys = ON")
     cursor.close()
+
 
 # engine = create_engine(f"sqlite:///workers.db", echo=True)
 engine = create_engine(f"sqlite:///workers.db", echo=False)
@@ -77,7 +77,7 @@ def create_postiton_names():
 def people_init():
     people = list()
     for i in range(INITIAL_PEOPLE_NUMBER):
-        people.append(Human(session))
+        people.append(People(session))
     session.add_all(people)
     session.flush()
     session.commit()
