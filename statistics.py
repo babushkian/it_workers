@@ -9,7 +9,7 @@ from model.human import People
 from model.worker_base import (PosBase,
                                LastSimDate,
                                Firm,
-                               HumanFirm, HumanPosition, FirmName
+                               PeopleFirm, PeoplePosition, FirmName
                                )
 
 
@@ -32,17 +32,10 @@ session = Session()
 
 def all_people_count():
     all_rec = session.query(People).count()
-    '''
-    SELECT count(*) AS count_1
-    FROM (SELECT humans.id AS humans_id, humans.first_name AS humans_fname, humans.second_name AS humans_sname, humans.last_name AS humans_lname, humans.birth_date AS humans_birth_date, humans.talent AS humans_talent, humans.start_work AS humans_start_work, humans.last_firm_id AS humans_firm_id, humans.position_id AS humans_pos_id, humans.death_date AS humans_death_date, humans.retire_date AS humans_retire_date 
-    FROM humans) AS anon_1
-    '''
-    print(f'Всего записей: {all_rec}')
+    print('-----------------------------')
+    print(f'Всего записей о людях: {all_rec}')
     all_rec = session.query(func.count(People.id)).scalar()
-    '''
-    SELECT count(humans.id) AS count_1 
-    FROM humans
-    '''
+
     print(f'Количество записей, вычисленное другим способом, более быстрым: {all_rec}')
 
 
@@ -70,8 +63,10 @@ def real_positions():
 def positions_distribution():
     # РАСПРЕДЕЛЕНИЕ ЛЮДЕЙ ПО ДОЛЖНОСТЯМ
     print('*' * 40, '\nРаспределение должностей среди людей')
-    x = (session.query(func.count(People.id).label('cont'), PosBase.name).join(PosBase)
-        .group_by(People.last_position_id).order_by(People.last_position_id).all()
+    x = (session.query(func.count(People.id).label('cont'), PosBase.name)
+         .join(PosBase)
+         .group_by(People.last_position_id)
+         .order_by(People.last_position_id).all()
          )
     for y in x:
         print(y.cont, y.name)
@@ -94,55 +89,65 @@ def people_from_firm_X():
     print('-----------------------------')
     print('Все люди, последним местом работы которых была фирма с id=1')
     print('-----------------------------')
-    x= session.query(People).options(joinedload('firm')).filter(Firm.id == 1).all()
+    x= session.query(People).options(joinedload('firm_with_name')).filter(Firm.id == 1).all()
     for i in x:
         print(i)
 
 
 
 
-# x = (session.query(HumanFirm.people_id, HumanFirm.move_to_firm_date, HumanFirm.last_firm_id, Firm.name)
+# x = (session.query(PeopleFirm.people_id, PeopleFirm.move_to_firm_date, PeopleFirm.last_firm_id, Firm.name)
 #      .join(Firm)
-#      .filter(HumanFirm.people_id<11)
-#      .order_by(HumanFirm.people_id, HumanFirm.move_to_firm_date)
+#      .filter(PeopleFirm.people_id<11)
+#      .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
 #      )
-print('-----------------------------')
-print('Фирмы, в которых работают люди с id<11')
-# сначала выделяем список идентификаторов всех фирм в которых работают выбранные люди
-y = (session.query( HumanFirm.firm_id)
-     .filter(HumanFirm.people_id < 11)
-     .order_by(HumanFirm.people_id)
-     )
-# затем по нужным идентификаторам фирм получаем записи фирм
-x = session.query(Firm).options(joinedload('firmname')).filter(Firm.id.in_(y)).all()
-'''
-ELECT firms.id AS firms_id, firms.firmname_id AS firms_firmname_id, firms.last_rating AS firms_last_rating, firms.open_date AS firms_open_date, firms.close_date AS firms_close_date, firmnames_1.id AS firmnames_1_id, firmnames_1.name AS firmnames_1_name, firmnames_1.used AS firmnames_1_used 
-FROM firms 
-LEFT OUTER JOIN firmnames AS firmnames_1 ON firmnames_1.id = firms.firmname_id 
-WHERE firms.id IN (
-    SELECT people_firms.firm_id 
-    FROM people_firms 
-    WHERE people_firms.people_id < 11 ORDER BY people_firms.people_id
-    )
-'''
 
-print(y)
-for i in x:
-    print(i)
+def firm_names_from_human_firms():
+    print('-----------------------------')
+    print('Фирмы, в которых работают люди с id<11')
+    print('сделано через промежутачную таблицу human_firms, а не через таблицу people, что было бы логично')
+    print('-----------------------------')
+    # сначала выделяем список идентификаторов всех фирм в которых работают выбранные люди
+    y = (session.query(PeopleFirm.firm_id)
+         .filter(PeopleFirm.people_id < 11)
+         .order_by(PeopleFirm.people_id)
+         )
+    # затем по нужным идентификаторам фирм получаем записи фирм
+    x = session.query(Firm).options(joinedload('firmname')).filter(Firm.id.in_(y)).all()
+    '''
+    SELECT firms.id AS firms_id, firms.firmname_id AS firms_firmname_id, firms.last_rating AS firms_last_rating, firms.open_date AS firms_open_date, firms.close_date AS firms_close_date, firmnames_1.id AS firmnames_1_id, firmnames_1.name AS firmnames_1_name, firmnames_1.used AS firmnames_1_used 
+    FROM firms JOIN firmnames AS firmnames_1 ON firmnames_1.id = firms.firmname_id 
+    WHERE firms.id IN (
+        SELECT people_firms.firm_id 
+        FROM people_firms 
+        WHERE people_firms.people_id < ? ORDER BY people_firms.people_id
+        )
+    '''
+    for i in x:
+        print(i)
 
 '''
 y = session.query(Firm).join(FirmName)
 print(y)
-x = (session.query(HumanFirm.people_id, HumanFirm.move_to_firm_date, HumanFirm.last_firm_id, Firm.firmname_id, FirmName.name)
+x = (session.query(PeopleFirm.people_id, PeopleFirm.move_to_firm_date, PeopleFirm.last_firm_id, Firm.firmname_id, FirmName.name)
      .join(y)
-     .filter(HumanFirm.people_id<11)
-     .order_by(HumanFirm.people_id, HumanFirm.move_to_firm_date))
+     .filter(PeopleFirm.people_id<11)
+     .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date))
 print(x)
 x = x.all()
 print(x)
 for i in x:
     print(f'{i.people_id:3d}  {i.move_to_firm_date}  {i.last_firm_id:3d}  {i.firmname_id}')
 '''
+
+
+all_people_count()
+mean_qualification()
+talent_mean_qualification()
+real_positions()
+positions_distribution()
+x = session.query(2+1).scalar()
+print(x)
 
 '''
 print('-----------------------------')
@@ -157,7 +162,7 @@ for i in x:
     print(i, 'опыт:', exp)
 
 print('-----------------------------')
-x = session.query(HumanPosition).filter(HumanPosition.people_id==6).order_by(HumanPosition.move_to_position_date).all()
+x = session.query(PeoplePosition).filter(PeoplePosition.people_id==6).order_by(PeoplePosition.move_to_position_date).all()
 for i in x:
     print(i.position_id, i.move_to_position_date)
 

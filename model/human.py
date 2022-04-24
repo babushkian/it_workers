@@ -7,8 +7,8 @@ from sqlalchemy.orm import relationship
 import settings
 from model.worker_base import (Base,
                                Position,
-                               HumanPosition,
-                               HumanFirm,
+                               PeoplePosition,
+                               PeopleFirm,
                                Firm,
                                LastSimDate)
 from settings import (get_birthday,
@@ -21,7 +21,7 @@ from settings import (get_birthday,
 
 
 class People(Base):
-    __tablename__ = 'humans'
+    __tablename__ = 'people'
     id = Column(Integer, primary_key=True)
     first_name = Column(String(50))
     second_name = Column(String(50))
@@ -33,10 +33,10 @@ class People(Base):
     last_position_id = Column(Integer, ForeignKey('positions.id'), index=True)
     death_date = Column(Date, index=True)
     retire_date = Column(Date, index=True)
-    firm = relationship('Firm', backref='humans')
+    recent_firm = relationship('Firm', back_populates='recent_emploees')
     worked_in_firms = relationship('Firm', secondary='people_firms' )
 
-    position = relationship('HumanPosition', backref='humans')
+    position = relationship('PeoplePosition', backref='humans')
     position_name = relationship('PosBase', backref='humans')
 
 
@@ -57,7 +57,7 @@ class People(Base):
 
     def assign(self):
         '''
-        при инициации нужно присвоить человеку какую-то должность. Делает ся это через таблицу human_positions
+        при инициации нужно присвоить человеку какую-то должность. Делает ся это через таблицу people_positions
         но из инита People сделать запись в нее нельзя, та как у People  в этот момент еще не определен id
         '''
         self.last_firm_id = Firm.get_rand_firm_id()
@@ -158,10 +158,10 @@ class People(Base):
 
     def change_position(self):
         self.last_position_id = self.pos.position
-        self.session.add(HumanPosition(people_id=self.id, position_id=self.last_position_id, move_to_position_date=get_anno()))
+        self.session.add(PeoplePosition(people_id=self.id, position_id=self.last_position_id, move_to_position_date=get_anno()))
 
     def migrate_record(self):
-        self.session.add(HumanFirm(people_id=self.id, firm_id=self.last_firm_id, move_to_firm_date=get_anno()))
+        self.session.add(PeopleFirm(people_id=self.id, firm_id=self.last_firm_id, move_to_firm_date=get_anno()))
 
     def migrate(self):
         '''
@@ -170,7 +170,7 @@ class People(Base):
         targ = Firm.get_rand_firm_id()
         if self.last_firm_id != targ:
             targ_firm_rating = self.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
-            attraction_mod = targ_firm_rating - self.firm.last_rating
+            attraction_mod = targ_firm_rating - self.recent_firm.last_rating
             chanse = (40 + attraction_mod) / (40 * 365)
             if random() < chanse:
                 self.last_firm_id = targ
