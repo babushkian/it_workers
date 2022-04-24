@@ -141,7 +141,7 @@ def firm_names_from_human_firms():
 
 def ever_worked_in_firm_X():
     x = (session.query(Firm)
-         .options(joinedload('people'),
+         .options(joinedload('people'),# это промежуточная таблица, а не people
                   joinedload('firmname'),
                   ).filter(Firm.id >7))
     print(x)
@@ -151,8 +151,8 @@ def ever_worked_in_firm_X():
         print('======================')
         print(i)
         print('======================')
-        for j in i.people:
-            print(j.human_conn)
+        for j in i.people: # people_firm вот така последовательность обращений через промеж таблицу
+            print(j.human_conn) # people
 
 
 
@@ -175,6 +175,26 @@ def people_yonger_than_1970():
         exp = (lsd - i.start_work).days if  i.start_work is not None else 0
         print(i, 'опыт:', exp)
 
+
+def promotion_dates():
+    print('-----------------------------')
+    print('Даты повышения человека - простой способ, без промежуточной таблицы')
+    x = session.query(PeoplePosition).filter(PeoplePosition.people_id==50).order_by(PeoplePosition.move_to_position_date).all()
+    for i in x:
+        print(i.position_id, i.move_to_position_date)
+
+
+    print('-----------------------------')
+    print('Даты повышения человека --- сложное соединение с явеым указанием усовмй соединения')
+    h = (session.query(People, PeoplePosition.position_id, PeoplePosition.move_to_position_date, PosBase.name)
+         .join(PeoplePosition, PeoplePosition.people_id == People.id)
+         .join(PosBase, PosBase.id == PeoplePosition.position_id)
+         .filter(People.id == 50).all()
+         )
+    for i in h:
+        print(i.People.first_name, i.People.last_name, i.position_id, i.name, i.move_to_position_date)
+
+
 #
 # all_people_count()
 # mean_qualification()
@@ -182,26 +202,14 @@ def people_yonger_than_1970():
 # real_positions()
 # positions_distribution()
 # real_firm_names()
-born_after_X_year()
+# born_after_X_year()
 # people_from_firm_X()
 # firm_names_from_human_firms()
 # ever_worked_in_firm_X()
-people_yonger_than_1970()
+# people_yonger_than_1970()
+promotion_dates()
+
 '''
-print('-----------------------------')
-x = session.query(PeoplePosition).filter(PeoplePosition.people_id==6).order_by(PeoplePosition.move_to_position_date).all()
-for i in x:
-    print(i.position_id, i.move_to_position_date)
-
-print('-----------------------------')
-print('Даты повышения человека')
-print('Достаются через отношения')
-h=session.query(People).filter(People.id == 2).one()
-print(h)
-for i in h.position:
-    print(i.position_id, i.move_to_position_date)
-
-
 print('-----------------------------')
 print('Вышедших на пенсию:', session.query(func.count(People.retire_date)).scalar())
 print('Умерших:', session.query(func.count(People.death_date)).scalar())
