@@ -80,7 +80,8 @@ class PeopleFirm(Base):
     firm_id = Column(Integer, ForeignKey('firms.id'))
     move_to_firm_date = Column(Date, index=True)
     __table_args__ = (Index('ix_people_firms_people_id_firm_id', people_id, firm_id),)
-
+    human_conn = relationship('People', back_populates='worked_in_firms')
+    firm_conn = relationship('Firm', back_populates='people')
 
 class PeoplePosition(Base):
     __tablename__ = 'people_positions'
@@ -100,9 +101,9 @@ class Firm(Base):
     open_date = Column(Date)
     close_date = Column(Date)
     ratings = relationship('FirmRating', backref='firms')
-    firmname = relationship('FirmName', uselist=False, back_populates="firm_with_name", innerjoin=True)
+    firmname = relationship('FirmName', back_populates="firm_with_name", uselist=False, innerjoin=True)
     recent_emploees = relationship('People', back_populates='recent_firm')
-    #people = relationship('People', secondary='human_firms')
+    people = relationship('PeopleFirm', back_populates='firm_conn')
 
     def __init__(self, n):
         self.firmname_id = n
@@ -159,7 +160,7 @@ class FirmName(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(70))
     used = Column(Boolean, default=False)
-    firm_with_name = relationship('Firm', uselist=False, back_populates='firmname')
+    firm_with_name = relationship('Firm', back_populates='firmname', uselist=False, innerjoin=True)
 
 class FirmRating(Base):
     __tablename__ = 'firm_ratings'

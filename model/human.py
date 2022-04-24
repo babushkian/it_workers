@@ -33,16 +33,16 @@ class People(Base):
     last_position_id = Column(Integer, ForeignKey('positions.id'), index=True)
     death_date = Column(Date, index=True)
     retire_date = Column(Date, index=True)
+
     recent_firm = relationship('Firm', back_populates='recent_emploees')
-    worked_in_firms = relationship('Firm', secondary='people_firms' )
-
-    position = relationship('PeoplePosition', backref='humans')
-    position_name = relationship('PosBase', backref='humans')
-
+    # у человека всегда есть позиция, поэтому LEFT OUTER JOIN не требуется
+    position_name = relationship('PosBase', innerjoin=True)
+    worked_in_firms = relationship('PeopleFirm', back_populates='human_conn')
 
     # дата начала работы
     # стаж. От него зависит вероятность продвижения по карьерной лестнице
-    # карьерная лестница: несколько ступеней, вероятность продвиджения на следуюшую ступень меньше, чем на предыдущую
+    # карьерная лестница: несколько ступеней, вероятность продвиджения на следуюшую ступень меньше,
+    # чем на предыдущую
     # талант: влияет на вероятность повышения и на вероятность понижения
 
     def __init__(self, ses):
@@ -179,5 +179,5 @@ class People(Base):
 
     def __repr__(self):
         s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date}, талант:{self.talent} \
-        фирма: "{self.firm.firmname.name}" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
+        фирма: "{self.recent_firm.firmname.name}" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
         return s

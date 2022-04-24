@@ -41,10 +41,12 @@ def all_people_count():
 
 def mean_qualification():
     # средняя квалификация по всем людям
-    print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
-    mean_pos = session.query(func.sum(People.last_position_id).label('p_sum'), func.count(People.last_position_id).label('p_count')).one()
-    print(mean_pos)
-    print(f"Среняя квалификация людей: {mean_pos.p_sum / mean_pos.p_count}")
+    print('=' * 20)
+    # mean_pos = session.query(func.sum(People.last_position_id).label('p_sum'), func.count(People.last_position_id).label('p_count')).one()
+    avg_pos = session.query(func.avg(People.last_position_id)).scalar()
+
+    #print(f"Среняя квалификация людей: {mean_pos.p_sum / mean_pos.p_count}")
+    print(f"Среняя квалификация людей: {avg_pos:5.3f}")
 
 def talent_mean_qualification():
     # средняя квалификация в зависимости от таланта
@@ -53,6 +55,15 @@ def talent_mean_qualification():
     print('средняя квалификация в зависимости от таланта')
     for i in p_tal:
         print(i.talent, i.tal_sum/i.tal_count)
+    print('-----------------------------')
+    print('То же самое, но короче')
+    avg_tal = (session.query(func.avg(People.last_position_id).label('tal_avg'), func.count(People.talent).label('tal_count'), People.talent)
+                .group_by(People.talent).order_by(People.talent).all()
+               )
+    for i in avg_tal:
+        print(f'{i.talent:3d} {i.tal_avg:6.3f} ({i.tal_count})')
+
+
 
 def real_positions():
     # выборка имеющихся должностей
@@ -84,15 +95,24 @@ def born_after_X_year():
     x= session.query(exists().where(People.birth_date >= date(1995, 1, 1))).scalar()
     print('-----------------------------')
     print('имеются ли люди младше 1994 года', x)
+    x = session.query(func.count(People.id)).filter(People.birth_date >= date(1995, 1, 1)).scalar()
+    print('Их количество:',x)
 
 def people_from_firm_X():
     print('-----------------------------')
     print('Все люди, последним местом работы которых была фирма с id=1')
     print('-----------------------------')
-    x= session.query(People).options(joinedload('firm_with_name')).filter(Firm.id == 1).all()
+    x = (session.query(People).join(Firm)
+         .options(
+            joinedload(People.recent_firm),
+            joinedload("recent_firm.firmname"), # видимо это свойство еще не объявлено, поэтому не резолвится через атрибут класса
+            joinedload(People.position_name),
+            )
+         .filter(Firm.id == 1).all()
+         )
     for i in x:
         print(i)
-
+    print('Количество записей: о людях, работающих в этой фирме: ', len(x))
 
 
 
@@ -114,53 +134,60 @@ def firm_names_from_human_firms():
          )
     # затем по нужным идентификаторам фирм получаем записи фирм
     x = session.query(Firm).options(joinedload('firmname')).filter(Firm.id.in_(y)).all()
-    '''
-    SELECT firms.id AS firms_id, firms.firmname_id AS firms_firmname_id, firms.last_rating AS firms_last_rating, firms.open_date AS firms_open_date, firms.close_date AS firms_close_date, firmnames_1.id AS firmnames_1_id, firmnames_1.name AS firmnames_1_name, firmnames_1.used AS firmnames_1_used 
-    FROM firms JOIN firmnames AS firmnames_1 ON firmnames_1.id = firms.firmname_id 
-    WHERE firms.id IN (
-        SELECT people_firms.firm_id 
-        FROM people_firms 
-        WHERE people_firms.people_id < ? ORDER BY people_firms.people_id
-        )
-    '''
+
     for i in x:
         print(i)
 
+
+def ever_worked_in_firm_X():
+    x = (session.query(Firm)
+         .options(joinedload('people'),
+                  joinedload('firmname'),
+                  ).filter(Firm.id >7))
+    print(x)
+    x = x.all()
+
+    for i in x:
+        print('======================')
+        print(i)
+        print('======================')
+        for j in i.people:
+            print(j.human_conn)
+
+
+
+def people_yonger_than_1970():
+    print('-----------------------------')
+    print('Список людей родившихся с 1970 года')
+    print('-----------------------------')
+    lsd = session.query(LastSimDate.date).scalar()
+
+    x = (session.query(People).options(
+        joinedload(People.recent_firm),
+        joinedload("recent_firm.firmname"),  # видимо это свойство еще не объявлено, поэтому не резолвится через атрибут класса
+        joinedload(People.position_name),
+    )
+         .filter(People.birth_date > date(1970, 1,1))
+         .order_by(People.birth_date).all()
+         )
+
+    for i in x:
+        exp = (lsd - i.start_work).days if  i.start_work is not None else 0
+        print(i, 'опыт:', exp)
+
+#
+# all_people_count()
+# mean_qualification()
+# talent_mean_qualification()
+# real_positions()
+# positions_distribution()
+# real_firm_names()
+born_after_X_year()
+# people_from_firm_X()
+# firm_names_from_human_firms()
+# ever_worked_in_firm_X()
+people_yonger_than_1970()
 '''
-y = session.query(Firm).join(FirmName)
-print(y)
-x = (session.query(PeopleFirm.people_id, PeopleFirm.move_to_firm_date, PeopleFirm.last_firm_id, Firm.firmname_id, FirmName.name)
-     .join(y)
-     .filter(PeopleFirm.people_id<11)
-     .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date))
-print(x)
-x = x.all()
-print(x)
-for i in x:
-    print(f'{i.people_id:3d}  {i.move_to_firm_date}  {i.last_firm_id:3d}  {i.firmname_id}')
-'''
-
-
-all_people_count()
-mean_qualification()
-talent_mean_qualification()
-real_positions()
-positions_distribution()
-x = session.query(2+1).scalar()
-print(x)
-
-'''
-print('-----------------------------')
-print('Список людей родившихся с 1970 года')
-print('-----------------------------')
-lsd = session.query(LastSimDate.date).scalar()
-x = session.query(People).filter(People.birth_date > date(1970, 1,1)).order_by(People.birth_date)
-print(x)
-x = x.all()
-for i in x:
-    exp = (lsd - i.start_work).days if  i.start_work is not None else 0
-    print(i, 'опыт:', exp)
-
 print('-----------------------------')
 x = session.query(PeoplePosition).filter(PeoplePosition.people_id==6).order_by(PeoplePosition.move_to_position_date).all()
 for i in x:
