@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, cast, Date
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, joinedload
 from sqlalchemy.sql import func, distinct, exists
@@ -226,7 +226,7 @@ def average_retire_age():
     print('Средний возраст выхода на пенсию ', (rsum/len(pens) if len(pens) >0 else 0))
 
 
-def average_death_age():
+def average_death_age_dumb():
     deaths = session.query(People.death_date, People.birth_date).filter(People.death_date.is_not(None))
 
     deaths = deaths.all()
@@ -237,6 +237,22 @@ def average_death_age():
         dsum += a
 
     print('Средний возраст смерти ', (dsum / len(deaths) if len(deaths) > 0 else 0))
+
+def average_death_age():
+    # в sqlite округляет даты до годов
+    deaths = (session.query(People.death_date - People.birth_date)
+              .filter(People.death_date.is_not(None))
+              )
+
+    mean_deaths = (session.query(func.avg(People.death_date - People.birth_date))
+              .filter(People.death_date.is_not(None)).scalar()
+              )
+
+    print('Средний возраст смерти:', mean_deaths)
+
+    for i in deaths:
+        print(i)
+
 
 
 # all_people_count()
@@ -252,7 +268,8 @@ def average_death_age():
 # people_yonger_than_1970()
 # promotion_dates()
 # retired_and_dead()
-average_retire_age()
+#average_retire_age()
+average_death_age_dumb()
 average_death_age()
 
 
