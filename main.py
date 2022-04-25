@@ -2,7 +2,7 @@
 from sqlalchemy import create_engine,  event
 from sqlalchemy.orm import sessionmaker
 import random
-random.seed(666)
+random.seed(667)
 
 
 import settings
@@ -40,8 +40,9 @@ session = Session()
 # создаем все таблицы
 Base.metadata.create_all(engine)
 
-def create_firm() -> Firm:
-    firm_name_id = Firm.get_unused_firmname_id()
+def create_firm(name_id=None) -> Firm:
+    firm_name_id = Firm.get_unused_firmname_id() if name_id==None else name_id
+    Firm.mark_firmname_as_used(firm_name_id)
     fi = Firm(firm_name_id)
     session.add(fi)
     session.flush()
@@ -51,7 +52,6 @@ def create_firm() -> Firm:
 
 def create_all_firms() -> list[ Firm]:
     # заполняем таблицу фирм
-    firms_list = list()
     fn_list = list()
     for name in settings.firm_names:
         fi = FirmName(name=name)
@@ -60,6 +60,9 @@ def create_all_firms() -> list[ Firm]:
     session.flush()
 
     Firm.bind_session(session)
+    # фейковая фирма для безработных
+    # такая же, как и все остальные, просто ее особо отслеживать надо
+    firms_list = [create_firm(name_id=1)]
 
     for n in range(INITIAL_FIRM_NUMBER):
         fi = create_firm()

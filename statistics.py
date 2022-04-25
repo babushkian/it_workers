@@ -117,20 +117,13 @@ def people_from_firm_X():
     print('Количество записей: о людях, работающих в этой фирме: ', len(x))
 
 
-
-# x = (session.query(PeopleFirm.people_id, PeopleFirm.move_to_firm_date, PeopleFirm.last_firm_id, Firm.name)
-#      .join(Firm)
-#      .filter(PeopleFirm.people_id<11)
-#      .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
-#      )
-
 def firm_names_from_human_firms():
     print('-----------------------------')
     print('Фирмы, в которых работают люди с id<11')
     print('сделано через промежутачную таблицу human_firms, а не через таблицу people, что было бы логично')
     print('-----------------------------')
     # сначала выделяем список идентификаторов всех фирм в которых работают выбранные люди
-    y = (session.query(PeopleFirm.firm_id)
+    y = (session.query(distinct(PeopleFirm.firm_id))
          .filter(PeopleFirm.people_id < 11)
          .order_by(PeopleFirm.people_id)
          )
@@ -166,8 +159,8 @@ def people_yonger_than_1970():
 
     x = (session.query(People).options(
         joinedload(People.recent_firm),
-        joinedload("recent_firm.firmname"),  # видимо это свойство еще не объявлено, поэтому не резолвится через атрибут класса
-        joinedload(People.position_name),
+        joinedload("recent_firm.firmname"),  # видимо это свойство еще не объявлено,
+        joinedload(People.position_name),    # поэтому не резолвится через атрибут класса
     )
          .filter(People.birth_date > date(1970, 1,1))
          .order_by(People.birth_date).all()
@@ -181,7 +174,11 @@ def people_yonger_than_1970():
 def promotion_dates():
     print('-----------------------------')
     print('Даты повышения человека - простой способ, без промежуточной таблицы')
-    x = session.query(PeoplePosition).filter(PeoplePosition.people_id==50).order_by(PeoplePosition.move_to_position_date).all()
+    x = (session.query(PeoplePosition)
+         .filter(PeoplePosition.people_id==50)
+         .order_by(PeoplePosition.move_to_position_date)
+         .all()
+         )
     for i in x:
         print(i.position_id, i.move_to_position_date)
 
@@ -210,13 +207,18 @@ def retired_and_dead():
     print("Умерших после выхода на пенсию")
     x = session.query(func.count(People.id)).filter(People.retire_date != People.death_date).scalar()
     print(x)
-    x = session.query(People.id, People.retire_date, People.death_date).filter(People.retire_date < People.death_date).all()
+    x = (session.query(People.id, People.retire_date, People.death_date)
+            .filter(People.retire_date < People.death_date)
+            .all()
+         )
     for i in x:
         print(f'{i.id:4d}  {i.retire_date} -- {i.death_date}')
 
 
 def average_retire_age():
-    pens = session.query(People.retire_date,People.birth_date ).filter(People.retire_date.is_not(None), People.retire_date !=People.death_date)
+    pens = (session.query(People.retire_date,People.birth_date )
+            .filter(People.retire_date.is_not(None),
+                    People.retire_date !=People.death_date))
     print(pens)
     pens = pens.all()
     print('Количество пенсионеров, вышедших на пенсию до смерти: ', len(pens))
@@ -276,22 +278,22 @@ def annual_avg_age():
 
 
 
-# all_people_count()
-# mean_qualification()
-# talent_mean_qualification()
-# real_positions()
-# positions_distribution()
-# real_firm_names()
-# born_after_X_year()
-# people_from_firm_X()
-# firm_names_from_human_firms()
-# ever_worked_in_firm_X()
-# people_yonger_than_1970()
-# promotion_dates()
-# retired_and_dead()
-# average_retire_age()
-# average_death_age_dumb()
-# average_death_age()
+all_people_count()
+mean_qualification()
+talent_mean_qualification()
+real_positions()
+positions_distribution()
+real_firm_names()
+born_after_X_year()
+people_from_firm_X()
+firm_names_from_human_firms()
+ever_worked_in_firm_X()
+people_yonger_than_1970()
+promotion_dates()
+retired_and_dead()
+average_retire_age()
+average_death_age_dumb()
+average_death_age()
 annual_avg_age()
 
 # самый старый живой человек. Надо считать тсходя из того, умер о или нет. Если не умер, то дату

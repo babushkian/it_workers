@@ -29,7 +29,7 @@ class People(Base):
     birth_date = Column(Date, index=True)
     talent = Column(Integer, index=True)
     start_work = Column(Date)
-    last_firm_id = Column(Integer, ForeignKey('firms.id'), default= None, index=True)
+    current_firm_id = Column(Integer, ForeignKey('firms.id'), default= 1, nullable=False, index=True)
     last_position_id = Column(Integer, ForeignKey('positions.id'),  index=True)
     death_date = Column(Date, index=True)
     retire_date = Column(Date, index=True)
@@ -73,7 +73,7 @@ class People(Base):
         anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
         if anniversary_20 <= get_anno():
             self.start_work =  anniversary_20
-            self.last_firm_id = Firm.get_rand_firm_id()
+            self.current_firm_id = Firm.get_rand_firm_id()
             # определили, что человек работает
             # а раз работает, сразу делаем запись что с сегодняшнего для он трудоустроен
             # в фирме, айдишник которой выпал при первоначальной генерации
@@ -126,6 +126,7 @@ class People(Base):
 
 
     def set_retired(self):
+        self.current_firm_id = 1
         self.retire_date = get_anno()
 
     def set_dead(self):
@@ -136,7 +137,9 @@ class People(Base):
     @property
     def age(self):
         today = get_anno()
-        age = today.year - self.birth_date.year - ((today.month, today.day) < (self.birth_date.month, self.birth_date.day))
+        age = (today.year - self.birth_date.year -
+               ((today.month, today.day) < (self.birth_date.month, self.birth_date.day))
+               )
         return age
 
 
@@ -148,35 +151,43 @@ class People(Base):
         if self.check_death() is False:
             if self.check_retirement() is False:
                 if self.check_start_work():
-                    promoted = self.pos.promotion(self.talent, self.experience)
-                    if promoted:
-                        self.change_position()
+                    if self.current_firm_id !=1: # если не безработный, можно повысить
+                        promoted = self.pos.promotion(self.talent, self.experience)
+                        if promoted:
+                            self.change_position()
                     tranfered = self.migrate()
                     if tranfered:
                         self.migrate_record()
 
     def change_position(self):
         self.last_position_id = self.pos.position
-        self.session.add(PeoplePosition(people_id=self.id, position_id=self.last_position_id, move_to_position_date=get_anno()))
+        self.session.add(PeoplePosition(
+            people_id=self.id,
+            position_id=self.last_position_id,
+            move_to_position_date=get_anno()))
 
     def migrate_record(self):
-        self.session.add(PeopleFirm(people_id=self.id, firm_id=self.last_firm_id, move_to_firm_date=get_anno()))
+        self.session.add(PeopleFirm(
+            people_id=self.id,
+            firm_id=self.current_firm_id,
+            move_to_firm_date=get_anno()))
 
     def migrate(self):
         '''
         Переходим в другую фирму
         '''
         targ = Firm.get_rand_firm_id()
-        if self.last_firm_id != targ:
+        if self.current_firm_id != targ:
             targ_firm_rating = self.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
             attraction_mod = targ_firm_rating - self.recent_firm.last_rating
             chanse = (40 + attraction_mod) / (40 * 365)
             if random() < chanse:
-                self.last_firm_id = targ
+                self.current_firm_id = targ
                 return True
         return False
 
     def __repr__(self):
-        s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date}, талант:{self.talent} \
-        фирма: "{self.recent_firm.firmname.name}" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
+        s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date},' \
+            f' талант:{self.talent} фирма: "{self.recent_firm.firmname.name}' \
+            f'" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
         return s

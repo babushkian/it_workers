@@ -129,7 +129,6 @@ class Firm(Base):
         pool = cls.session.query(FirmName.id).filter(FirmName.used==False).all()
         assert len(pool) > 0, 'нет свободных названий фирм'
         new_id = choice(pool)[0]
-        cls.mark_firmname_as_used(new_id)
         return new_id
 
     @classmethod
