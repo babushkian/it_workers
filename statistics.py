@@ -194,8 +194,51 @@ def promotion_dates():
     for i in h:
         print(i.People.first_name, i.People.last_name, i.position_id, i.name, i.move_to_position_date)
 
+def age(birth, event):
+    age = event.year - birth.year - ((event.month, event.day) < (birth.month, birth.day))
+    return age
 
-#
+def retired_and_dead():
+    print('-----------------------------')
+    print('Вышедших на пенсию:', session.query(func.count(People.retire_date)).scalar())
+    print('Умерших:', session.query(func.count(People.death_date)).scalar())
+    print('')
+
+
+    print("Умерших после выхода на пенсию")
+    x = session.query(func.count(People.id)).filter(People.retire_date != People.death_date).scalar()
+    print(x)
+    x = session.query(People.id, People.retire_date, People.death_date).filter(People.retire_date < People.death_date).all()
+    for i in x:
+        print(f'{i.id:4d}  {i.retire_date} -- {i.death_date}')
+
+
+def average_retire_age():
+    pens = session.query(People.retire_date,People.birth_date ).filter(People.retire_date.is_not(None), People.retire_date !=People.death_date)
+    print(pens)
+    pens = pens.all()
+    print('Количество пенсионеров, вышедших на пенсию до смерти: ', len(pens))
+
+    rsum = 0
+    for i in pens:
+        a = age(i.birth_date, i.retire_date)
+        rsum += a
+    print('Средний возраст выхода на пенсию ', (rsum/len(pens) if len(pens) >0 else 0))
+
+
+def average_death_age():
+    deaths = session.query(People.death_date, People.birth_date).filter(People.death_date.is_not(None))
+
+    deaths = deaths.all()
+
+    dsum = 0
+    for i in deaths:
+        a = age(i.birth_date, i.death_date)
+        dsum += a
+
+    print('Средний возраст смерти ', (dsum / len(deaths) if len(deaths) > 0 else 0))
+
+
 # all_people_count()
 # mean_qualification()
 # talent_mean_qualification()
@@ -207,47 +250,13 @@ def promotion_dates():
 # firm_names_from_human_firms()
 # ever_worked_in_firm_X()
 # people_yonger_than_1970()
-promotion_dates()
-
-'''
-print('-----------------------------')
-print('Вышедших на пенсию:', session.query(func.count(People.retire_date)).scalar())
-print('Умерших:', session.query(func.count(People.death_date)).scalar())
-print('')
-
-print("Умерших после выхода на пенсию")
-x = session.query(func.count(People.id)).filter(People.retire_date != People.death_date).scalar()
-print(x)
-x = session.query(People.id, People.retire_date, People.death_date).filter(People.retire_date < People.death_date).all()
-for i in x:
-    print(f'{i.id:4d}  {i.retire_date} -- {i.death_date}')
-
-def age(birth, event):
-    age = event.year - birth.year - ((event.month, event.day) < (birth.month, birth.day))
-    return age
+# promotion_dates()
+# retired_and_dead()
+average_retire_age()
+average_death_age()
 
 
-pens = session.query(People.retire_date,People.birth_date ).filter(People.retire_date.is_not(None), People.retire_date !=People.death_date)
-print(pens)
-pens = pens.all()
-print('Количество пенсионеров, вышедших на пенсию до смерти: ', len(pens))
-rsum = 0
-for i in pens:
-    a = age(i.birth_date, i.retire_date)
-    rsum += a
+# самый старый живой человек. Надо считать тсходя из того, умер о или нет. Если не умер, то дату
+# рождения отнимаем от плсоедней даты симуляции
 
-
-
-print('Средний возраст выхода на пенсию ', (rsum/len(pens) if len(pens) >0 else 0))
-
-deaths = session.query(People.death_date,People.birth_date ).filter(People.death_date.is_not(None))
-
-deaths = deaths.all()
-
-dsum = 0
-for i in deaths:
-    a = age(i.birth_date, i.death_date)
-    dsum += a
-
-print('Средний возраст смерти ', (dsum/len(deaths) if len(deaths) >0 else 0))
-'''
+# как часто люди переходят из одной фирмы в другую?
