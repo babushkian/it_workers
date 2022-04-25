@@ -29,8 +29,8 @@ class People(Base):
     birth_date = Column(Date, index=True)
     talent = Column(Integer, index=True)
     start_work = Column(Date)
-    last_firm_id = Column(Integer, ForeignKey('firms.id'), index=True)
-    last_position_id = Column(Integer, ForeignKey('positions.id'), index=True)
+    last_firm_id = Column(Integer, ForeignKey('firms.id'), default= None, index=True)
+    last_position_id = Column(Integer, ForeignKey('positions.id'),  index=True)
     death_date = Column(Date, index=True)
     retire_date = Column(Date, index=True)
 
@@ -57,11 +57,9 @@ class People(Base):
 
     def assign(self):
         '''
-        при инициации нужно присвоить человеку какую-то должность. Делает ся это через таблицу people_positions
+        при инициации нужно присвоить человеку какую-то должность. Делается это через таблицу people_positions
         но из инита People сделать запись в нее нельзя, та как у People  в этот момент еще не определен id
         '''
-        self.last_firm_id = Firm.get_rand_firm_id()
-
         self.initial_check_start_work()
         self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
         self.change_position()
@@ -75,6 +73,7 @@ class People(Base):
         anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
         if anniversary_20 <= get_anno():
             self.start_work =  anniversary_20
+            self.last_firm_id = Firm.get_rand_firm_id()
             # определили, что человек работает
             # а раз работает, сразу делаем запись что с сегодняшнего для он трудоустроен
             # в фирме, айдишник которой выпал при первоначальной генерации

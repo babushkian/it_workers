@@ -108,7 +108,7 @@ for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     for p in people:
         p.update()
 
-    if random.random() < (1/240):
+    if len(firm_list) <16 and  random.random() < (1/240): # не больше 16 фирм
         print('создана новая фирма')
         firm_list.append(create_firm())
     session.commit()

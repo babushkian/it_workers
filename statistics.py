@@ -275,9 +275,6 @@ def annual_avg_age():
 
 
 
-# .filter(or_(
-#     People.death_date == None,
-#     People.death_date > check_date)
 
 # all_people_count()
 # mean_qualification()
