@@ -1,15 +1,17 @@
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import create_engine, event, cast, Date
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, joinedload
-from sqlalchemy.sql import func, distinct, exists
+from sqlalchemy.sql import func, distinct, exists, or_
 from pathlib import Path
 from model.human import People
 from model.worker_base import (PosBase,
                                LastSimDate,
                                Firm,
-                               PeopleFirm, PeoplePosition, FirmName
+                               PeopleFirm, PeoplePosition,
+                               FirmName,
+                               FirmRating
                                )
 
 
@@ -25,7 +27,7 @@ basefile = 'mega_workers.db'
 if Path(basefile).exists() == False:
     basefile ='workers.db'
 
-engine = create_engine(f"sqlite:///{basefile}", echo=True)
+engine = create_engine(f"sqlite:///{basefile}", echo=False)
 Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
@@ -240,7 +242,7 @@ def average_death_age_dumb():
 
 def average_death_age():
     # в sqlite округляет даты до годов
-    deaths = (session.query(People.death_date - People.birth_date)
+    deaths = (session.query((People.death_date - People.birth_date))
               .filter(People.death_date.is_not(None))
               )
 
@@ -253,7 +255,29 @@ def average_death_age():
     for i in deaths:
         print(i)
 
+def annual_avg_age():
+    print('------------------')
+    print('Средний возраст:')
 
+    x = session.query(distinct(FirmRating.rdate)).filter(FirmRating.rdate.like('%01-01%')).all()
+    for i in x:
+        check_date=i[0]
+        y = (session.query(People.birth_date)
+             .filter(or_(
+                People.death_date == None,
+                People.death_date > check_date)
+            ).all())
+        cumsum=0
+        for d in y:
+            cumsum += age(d[0], check_date )
+        avg_age = cumsum/len(y)
+        print(f'{check_date} {avg_age:5.1f}')
+
+
+
+# .filter(or_(
+#     People.death_date == None,
+#     People.death_date > check_date)
 
 # all_people_count()
 # mean_qualification()
@@ -268,12 +292,12 @@ def average_death_age():
 # people_yonger_than_1970()
 # promotion_dates()
 # retired_and_dead()
-#average_retire_age()
-average_death_age_dumb()
-average_death_age()
-
+# average_retire_age()
+# average_death_age_dumb()
+# average_death_age()
+annual_avg_age()
 
 # самый старый живой человек. Надо считать тсходя из того, умер о или нет. Если не умер, то дату
 # рождения отнимаем от плсоедней даты симуляции
-
+# ежегодный отчет по количеству сотрудников в фирмах
 # как часто люди переходят из одной фирмы в другую?
