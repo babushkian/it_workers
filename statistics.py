@@ -309,10 +309,12 @@ def directors_migrations2():
     x = (session.query(PeopleFirm, PeoplePosition)
          .join(PeoplePosition, PeopleFirm.people_id == PeoplePosition.people_id)
          .filter(PeoplePosition.position_id==Position.CAP)
-         .order_by(PeopleFirm.move_to_firm_date, PeopleFirm.firm_id).all()
+         .order_by(PeopleFirm.id, PeopleFirm.firm_id).all()
+
          )
+
     for i in x:
-        print(f'{i.PeopleFirm.id:3d} {i.PeoplePosition.id:3d} | {i.PeopleFirm.firm_id:3d} | {i.PeopleFirm.people_id:3d} {i.PeoplePosition.people_id} {i.PeoplePosition.move_to_position_date} {i.PeopleFirm.move_to_firm_date}')
+        print(f'{i.PeopleFirm.id=:3d} {i.PeoplePosition.id=:3d} | {i.PeopleFirm.firm_id:3d} | {i.PeopleFirm.people_id=:3d}  {i.PeoplePosition.position_id=:3d}  {i.PeoplePosition.move_to_position_date} {i.PeopleFirm.move_to_firm_date}')
 
 
 

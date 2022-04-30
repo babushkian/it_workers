@@ -2,7 +2,7 @@ from random import  randint
 from datetime import datetime, date, timedelta
 from names import firm_names, first_name, second_name, last_name, position_names
 
-SIM_YEARS = .01
+SIM_YEARS = .02
 YEAR_LENGTH = 365
 INITIAL_PEOPLE_NUMBER = 100
 INITIAL_FIRM_NUMBER = 6
@@ -12,6 +12,7 @@ COL_FIRM = len(firm_names)
 
 # константа для обозначения id фейковой фирмы для безработных
 UNEMPLOYED = 1
+
 
 DEATH_MIN_AGE = 30
 DEATH_MAX_AGE = 90

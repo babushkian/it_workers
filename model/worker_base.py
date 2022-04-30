@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import Column, Integer, String,  Date, Boolean,  ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -20,11 +21,11 @@ class Position():
 
     CAP = len(settings.position_names)
 
-    def __init__(self, ses, human, initial_position = None):
+    def __init__(self, ses, human: 'People', initial_position:  Optional[int] = None):
         self.session = ses
         self.human = human
         if initial_position is None:
-            self.__position = 1  if self.human.start_work is None else 2
+            self.__position = 1
         else:
             self.__position = initial_position
 
@@ -35,6 +36,11 @@ class Position():
     def become_worker(self):
         # при начале работы надо сменить позицию с безработного на работника
         self.__position = 2
+
+    def become_director(self):
+        # при начале работы надо сменить позицию с безработного на работника
+        self.__position = Position.CAP
+
 
     @property
     def posname(self):
@@ -120,12 +126,15 @@ class Firm(Base):
     def bind_session(cls, session):
         cls.session = session
 
-    def assign_director(self, director ):
+    def assign_director(self, director: 'People'):
         # если это не фейковая фирма для безработных, назначаем директора
         print('=========================================')
         print(f'идентификатор фирмы {self.id} идентификатор директора {director.id}')
-        if self.firmname_id != UNEMPLOYED:
-            director.assign(firm_id=self.id, pos_id=Position.CAP)
+        if self.id != UNEMPLOYED:
+            director.migrate(firm_id=self.id)
+            director.migrate_record()
+            director.pos.become_director()
+            director.change_position_record()
 
 
     @classmethod
@@ -149,7 +158,7 @@ class Firm(Base):
     def mark_firmname_as_used(cls, new_id):
         cls.session.query(FirmName).filter(FirmName.id == new_id).update({'used':True})
 
-    def assign(self, director):
+    def assign(self, director:'People'):
         self.assign_director(director)
 
 
@@ -170,11 +179,6 @@ class Firm(Base):
         if self.id == UNEMPLOYED:
             return f'<id:{self.id} "{self.firmname.name}"  рейтинг: {self.last_rating}>'
         else:
-            director_id = (Firm.session.query(Firm).
-                           join(PeopleFirm)
-                           .filter(PeopleFirm.people_id==8)
-                           .order_by(PeopleFirm.move_to_firm_date.desc())
-                           .first())
             director_id = (Firm.session.query(PeopleFirm.people_id).
                            join(Firm)
                            .filter(PeopleFirm.people_id==8, Firm.id == self.id)

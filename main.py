@@ -15,6 +15,7 @@ from model.worker_base import (Base,
                                LastSimDate,
                                PosBase,
                                Firm, FirmName,
+                               Position
                                )
 from model.human import People
 
@@ -49,16 +50,16 @@ def create_firm(name_id=None) -> Firm:
     session.flush()
     return fi
 
-
 def create_all_firms() -> list[ Firm]:
     # заполняем таблицу фирм
     # создаем названия фирм
-    fn_list = list()
+    firmname_list = list()
     for name in settings.firm_names:
         fi = FirmName(name=name)
-        fn_list.append(fi)
-    session.add_all(fn_list)
+        firmname_list.append(fi)
+    session.add_all(firmname_list)
     session.flush()
+    del firmname_list
 
     Firm.bind_session(session)
     # фейковая фирма для безработных
@@ -74,14 +75,19 @@ def create_all_firms() -> list[ Firm]:
     return firms_list
 
 
+def init_firm(firm, people):
+    # выбираем директора - человека способного работать и не приписанного ни к какой фирме
+    print(f'{firm=}')
+    while True:
+        director = random.choice(people)
+        # трудоспособный и не является директором
+        if director.pos.position != Position.CAP and director.age > 19:
+            break
+    firm.assign(director)
+
 def firms_init(firms_list, people):
     for firm in firms_list:
-        # выбираем директора - человека способного работать и не приписанного ни к какой фирме
-        while True:
-            director = random.choice(people)
-            if director.pos == None and director.age > 19:
-                break
-        firm.assign(director)
+        init_firm(firm, people)
     session.commit()
 
 
@@ -91,7 +97,7 @@ def create_postiton_names():
     session.commit()
 
 
-def create_people():
+def create_people()->list[People]:
     '''
     Создаем людей не присваивая им никакие данные связанные с работой.
     '''
@@ -111,6 +117,10 @@ def people_init(people):
     session.commit()
 
 
+def assign_people_to_firms(people):
+    for hum in people:
+        hum.unemployed_to_worker()
+    session.commit()
 
 
 
@@ -118,9 +128,13 @@ create_postiton_names()
 
 firm_list = create_all_firms()
 people =create_people()
-firms_init(firm_list, people)
+people_init(people) # превоначальная инициация, все безработные
 
-people_init(people)
+for i in people:
+    assert i.pos is not None, f'у человека {i.id} не инициирована позиция'
+
+firms_init(firm_list, people)
+assign_people_to_firms(people) # после того, как закрепили за фирмами директоров, устраиваем на работу всех остальных
 
 lsd = LastSimDate()
 session.add(lsd)
@@ -137,7 +151,9 @@ for t in range(int(YEAR_LENGTH * SIM_YEARS)):
 
     if len(firm_list) <16 and  random.random() < (1/240): # не больше 16 фирм
         print('создана новая фирма')
-        firm_list.append(create_firm())
+        f = create_firm()
+        init_firm(f, people)
+        firm_list.append(f)
     session.commit()
 
 # ---------------------------------------------

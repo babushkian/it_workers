@@ -1,3 +1,5 @@
+from typing import Optional
+
 from datetime import timedelta, date
 from random import choice, randint, random
 
@@ -58,34 +60,41 @@ class People(Base):
         # проверять, не привоена ли ему уже должность (директор фирмы)
         self.pos = None
 
-    def assign(self, firm_id=None, pos_id=None):
+    def assign(self, firm_id: Optional[int]=None, pos_id: Optional[int]=None):
         '''
         при инициации нужно присвоить человеку какую-то должность. Делается это через таблицу people_positions
         но из инита People сделать запись в нее нельзя, та как у People  в этот момент еще не определен id
         '''
-        self.initial_check_start_work(firm_id)
-        if self.pos is None:
-            self.pos = Position(self.session, self, pos_id)
-            self.change_position()
-
-
-    def initial_check_start_work(self, firm_id):
         # как только человеку исполняется 20 лет, он начинает работать
         y = self.birth_date.year + 20
         anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
-        self.start_work =  anniversary_20
-        if anniversary_20 <= get_anno() and self.current_firm_id == UNEMPLOYED:
-            print(self.current_firm_id)
-            if firm_id:
-                self.current_firm_id = firm_id
-            else:
-                self.current_firm_id = Firm.get_rand_firm_id()
-            # определили, что человек работает
-            # а раз работает, сразу делаем запись что с сегодняшнего для он трудоустроен
-            # в фирме, айдишник которой выпал при первоначальной генерации
-            self.migrate_record()
+        if anniversary_20 <= get_anno():
+            self.start_work =  anniversary_20
+        self.pos = Position(self.session, self, UNEMPLOYED)
+        # self.change_position_record()
+        self.current_firm_id = UNEMPLOYED
+        # self.migrate_record()
 
-    def check_start_work(self):
+    def assign_to_firm(self, firm_id):
+        if firm_id:
+            self.self.current_firm_id = firm_id
+        else:
+            self.current_firm_id = Firm.get_rand_firm_id()
+        self.migrate_record()
+        self.pos.become_worker()  # повышаем с безработного жо первой ступени работника
+        self.change_position_record()
+
+    def unemployed_to_worker(self, firm_id=None):
+        if self.start_work:
+            # трудоспособных безработных надо трудоустроить
+            # записи о директорах уже сделаны ранее, теперь надо занести работяг
+            if self.current_firm_id == UNEMPLOYED:
+                self.assign_to_firm(firm_id)
+        else: #  осталась молодежь - записываем, что она не работает
+            self.migrate_record()
+            self.change_position_record()
+
+    def check_start_work(self, firm_id=None):
         if self.start_work is None:
             # как только человеку исполняется 20 лет, он начинает работать
             if self.age < 20:
@@ -93,9 +102,7 @@ class People(Base):
             else:
                 # если человеку больше 19 лет иначе он не работает
                 self.start_work = get_anno()
-                self.pos.become_worker() # повышаем с безработного жо первой ступени работника
-                self.change_position() # делаем запись о смене позиции
-                self.migrate_record() # делаем запись о начале работы в фирме
+                self.assign_to_firm(firm_id)
                 return True
         else:
             return True
@@ -129,8 +136,6 @@ class People(Base):
             else:
                 return False
 
-
-
     def set_retired(self):
         self.current_firm_id = 1
         self.retire_date = get_anno()
@@ -148,7 +153,6 @@ class People(Base):
                )
         return age
 
-
     @property
     def experience(self):
         return (get_anno() - self.start_work).days
@@ -160,21 +164,21 @@ class People(Base):
                     if self.current_firm_id !=1: # если не безработный, можно повысить
                         promoted = self.pos.promotion(self.talent, self.experience)
                         if promoted:
-                            self.change_position()
+                            self.change_position_record()
                     tranfered = self.migrate()
                     if tranfered:
                         self.migrate_record()
 
-    def change_position(self):
+    def change_position_record(self):
         self.last_position_id = self.pos.position
         self.session.add(PeoplePosition(
             people_id=self.id,
-            position_id=self.last_position_id,
+            position_id=self.pos.position,
             move_to_position_date=get_anno()))
 
     def migrate_record(self):
         print('--------------- \n\tзапись о переходе в другую фирму')
-        print(f'\t{get_anno()} человек {self.id} уходит в фирму {self.current_firm_id}')
+        print(f'\t{get_anno()} человек {self.id} с должностью {self.pos.position} уходит в фирму {self.current_firm_id}')
         self.session.add(PeopleFirm(
             people_id=self.id,
             firm_id=self.current_firm_id,
@@ -184,11 +188,13 @@ class People(Base):
         '''
         Переходим в другую фирму
         '''
-        if firm_id is not None:
-            self.current_firm_id= firm_id
+        if firm_id is not None: # принудительный переход в конкретную фирму
+            self.current_firm_id = firm_id
             return True
         else:
-            if self.pos.position < Position.CAP: # директору не стоит уходить из своей фирмы
+            # директору не стоит уходить из своей фирмы
+            # если отсутствие работы тоже считать фирмой, то директор даже уволиться не может
+            if self.pos.position < Position.CAP:
                 targ = Firm.get_rand_firm_id()
                 if self.current_firm_id != targ:
                     targ_firm_rating = self.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
