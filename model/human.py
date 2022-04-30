@@ -137,8 +137,11 @@ class People(Base):
                 return False
 
     def set_retired(self):
-        self.current_firm_id = 1
+        self.current_firm_id = UNEMPLOYED
+        self.pos.set_position(UNEMPLOYED)
         self.retire_date = get_anno()
+        self.migrate_record()
+        self.change_position_record()
 
     def set_dead(self):
         self.death_date = get_anno()

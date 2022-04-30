@@ -33,6 +33,9 @@ class Position():
     def position(self):
         return self.__position
 
+    def set_position(self, value):
+        self.__position = value
+
     def become_worker(self):
         # при начале работы надо сменить позицию с безработного на работника
         self.__position = 2
