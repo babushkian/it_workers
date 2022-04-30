@@ -17,7 +17,8 @@ from settings import (get_birthday,
                       RETIREMENT_DELTA,
                       DEATH_DELTA,
                       YEAR_LENGTH,
-                      DEATH_MIN_AGE)
+                      DEATH_MIN_AGE,
+                      UNEMPLOYED,)
 
 
 class People(Base):
@@ -53,27 +54,32 @@ class People(Base):
         self.birth_date = get_birthday()  # день рождения
         self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
+        # изначально человек не имеет никакой должности Инициализируется, чтобы в методе assign
+        # проверять, не привоена ли ему уже должность (директор фирмы)
+        self.pos = None
 
-
-    def assign(self):
+    def assign(self, firm_id=None, pos_id=None):
         '''
         при инициации нужно присвоить человеку какую-то должность. Делается это через таблицу people_positions
         но из инита People сделать запись в нее нельзя, та как у People  в этот момент еще не определен id
         '''
-        self.initial_check_start_work()
-        self.pos = Position(self.session, self) # если человек не достиг трудового возраста, он будет безработный
-        self.change_position()
+        self.initial_check_start_work(firm_id)
+        if self.pos is None:
+            self.pos = Position(self.session, self, pos_id)
+            self.change_position()
 
 
-
-
-    def initial_check_start_work(self):
+    def initial_check_start_work(self, firm_id):
         # как только человеку исполняется 20 лет, он начинает работать
         y = self.birth_date.year + 20
         anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
-        if anniversary_20 <= get_anno():
-            self.start_work =  anniversary_20
-            self.current_firm_id = Firm.get_rand_firm_id()
+        self.start_work =  anniversary_20
+        if anniversary_20 <= get_anno() and self.current_firm_id == UNEMPLOYED:
+            print(self.current_firm_id)
+            if firm_id:
+                self.current_firm_id = firm_id
+            else:
+                self.current_firm_id = Firm.get_rand_firm_id()
             # определили, что человек работает
             # а раз работает, сразу делаем запись что с сегодняшнего для он трудоустроен
             # в фирме, айдишник которой выпал при первоначальной генерации
@@ -167,24 +173,31 @@ class People(Base):
             move_to_position_date=get_anno()))
 
     def migrate_record(self):
+        print('--------------- \n\tзапись о переходе в другую фирму')
+        print(f'\t{get_anno()} человек {self.id} уходит в фирму {self.current_firm_id}')
         self.session.add(PeopleFirm(
             people_id=self.id,
             firm_id=self.current_firm_id,
             move_to_firm_date=get_anno()))
 
-    def migrate(self):
+    def migrate(self, firm_id=None):
         '''
         Переходим в другую фирму
         '''
-        targ = Firm.get_rand_firm_id()
-        if self.current_firm_id != targ:
-            targ_firm_rating = self.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
-            attraction_mod = targ_firm_rating - self.recent_firm.last_rating
-            chanse = (40 + attraction_mod) / (40 * 365)
-            if random() < chanse:
-                self.current_firm_id = targ
-                return True
-        return False
+        if firm_id is not None:
+            self.current_firm_id= firm_id
+            return True
+        else:
+            if self.pos.position < Position.CAP: # директору не стоит уходить из своей фирмы
+                targ = Firm.get_rand_firm_id()
+                if self.current_firm_id != targ:
+                    targ_firm_rating = self.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
+                    attraction_mod = targ_firm_rating - self.recent_firm.last_rating
+                    chanse = (40 + attraction_mod) / (40 * 365)
+                    if random() < chanse:
+                        self.current_firm_id = targ
+                        return True
+            return False
 
     def __repr__(self):
         s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date},' \

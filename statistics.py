@@ -10,6 +10,7 @@ from model.worker_base import (PosBase,
                                LastSimDate,
                                Firm,
                                PeopleFirm, PeoplePosition,
+                               Position,
                                FirmName,
                                FirmRating
                                )
@@ -31,6 +32,9 @@ engine = create_engine(f"sqlite:///{basefile}", echo=False)
 Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
+
+Firm.bind_session(session)
+
 
 def all_people_count():
     all_rec = session.query(People).count()
@@ -276,25 +280,62 @@ def annual_avg_age():
         print(f'{check_date} {avg_age:5.1f}')
 
 
+def directors_migrations():
+    print('------------------')
+    print('Все переходы директоров из одной фирмы в другую:')
+    print('------------------')
+    print('Идентификаторы директоров:')
+    y = session.query(PeoplePosition.people_id).filter(PeoplePosition.position_id== Position.CAP).all()
+    print(y)
+    directors = session.query(PeoplePosition).filter(PeoplePosition.position_id== Position.CAP).subquery()
+    # здесь у на сиспользуется связанный подзапрос
+    x = (session.query(PeopleFirm.firm_id, PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
+         .join(directors, PeopleFirm.people_id == directors.c.people_id)
+         .order_by(PeopleFirm.move_to_firm_date, PeopleFirm.firm_id).all()
+         )
+    for i in x:
+        print(i)
 
 
-all_people_count()
-mean_qualification()
-talent_mean_qualification()
-real_positions()
-positions_distribution()
-real_firm_names()
-born_after_X_year()
-people_from_firm_X()
-firm_names_from_human_firms()
-ever_worked_in_firm_X()
-people_yonger_than_1970()
-promotion_dates()
-retired_and_dead()
-average_retire_age()
-average_death_age_dumb()
-average_death_age()
-annual_avg_age()
+def directors_migrations2():
+    print('------------------')
+    print('Все переходы директоров из одной фирмы в другую:')
+    print('То же самое, что в проедыдущей функции но без использования подзапроса')
+    print('------------------')
+    print('Идентификаторы директоров:')
+    y = session.query(PeoplePosition.people_id).filter(PeoplePosition.position_id== Position.CAP).all()
+    print(y)
+    # без подзапроса
+    x = (session.query(PeopleFirm, PeoplePosition)
+         .join(PeoplePosition, PeopleFirm.people_id == PeoplePosition.people_id)
+         .filter(PeoplePosition.position_id==Position.CAP)
+         .order_by(PeopleFirm.move_to_firm_date, PeopleFirm.firm_id).all()
+         )
+    for i in x:
+        print(f'{i.PeopleFirm.id:3d} {i.PeoplePosition.id:3d} | {i.PeopleFirm.firm_id:3d} | {i.PeopleFirm.people_id:3d} {i.PeoplePosition.people_id} {i.PeoplePosition.move_to_position_date} {i.PeopleFirm.move_to_firm_date}')
+
+
+
+
+# all_people_count()
+# mean_qualification()
+# talent_mean_qualification()
+# real_positions()
+# positions_distribution()
+# real_firm_names()
+# born_after_X_year()
+# people_from_firm_X()
+#firm_names_from_human_firms()
+# ever_worked_in_firm_X()
+# people_yonger_than_1970()
+# promotion_dates()
+# retired_and_dead()
+# average_retire_age()
+# average_death_age_dumb()
+# average_death_age()
+# annual_avg_age()
+directors_migrations()
+directors_migrations2()
 
 # самый старый живой человек. Надо считать тсходя из того, умер о или нет. Если не умер, то дату
 # рождения отнимаем от плсоедней даты симуляции

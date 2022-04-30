@@ -9,6 +9,7 @@ import settings
 from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
                         INITIAL_PEOPLE_NUMBER,
                         INITIAL_FIRM_NUMBER,
+                        UNEMPLOYED
                       )
 from model.worker_base import (Base,
                                LastSimDate,
@@ -46,12 +47,12 @@ def create_firm(name_id=None) -> Firm:
     fi = Firm(firm_name_id)
     session.add(fi)
     session.flush()
-    fi.assign()
-    session.flush()
     return fi
+
 
 def create_all_firms() -> list[ Firm]:
     # заполняем таблицу фирм
+    # создаем названия фирм
     fn_list = list()
     for name in settings.firm_names:
         fi = FirmName(name=name)
@@ -62,13 +63,26 @@ def create_all_firms() -> list[ Firm]:
     Firm.bind_session(session)
     # фейковая фирма для безработных
     # такая же, как и все остальные, просто ее особо отслеживать надо
-    firms_list = [create_firm(name_id=1)]
+    # первой делаем фирму с первым названием в списке имен фирм
+    firms_list = [create_firm(name_id=UNEMPLOYED)]
 
-    for n in range(INITIAL_FIRM_NUMBER):
+    for _ in range(INITIAL_FIRM_NUMBER):
+        # выбираем директора - человека способного работать и не приписанного ни к какой фирме
         fi = create_firm()
         firms_list.append(fi)
     session.commit()
     return firms_list
+
+
+def firms_init(firms_list, people):
+    for firm in firms_list:
+        # выбираем директора - человека способного работать и не приписанного ни к какой фирме
+        while True:
+            director = random.choice(people)
+            if director.pos == None and director.age > 19:
+                break
+        firm.assign(director)
+    session.commit()
 
 
 def create_postiton_names():
@@ -76,28 +90,38 @@ def create_postiton_names():
         session.add(PosBase(name = i))
     session.commit()
 
-# инициируем людей
-def people_init():
+
+def create_people():
+    '''
+    Создаем людей не присваивая им никакие данные связанные с работой.
+    '''
     people = list()
     for i in range(INITIAL_PEOPLE_NUMBER):
         people.append(People(session))
     session.add_all(people)
     session.flush()
     session.commit()
-    for hum in people:
-        hum.assign()
-    session.commit()
     return people
 
 
+# инициируем людей
+def people_init(people):
+    for hum in people:
+        hum.assign()
+    session.commit()
 
+
+
+
+
+create_postiton_names()
 
 firm_list = create_all_firms()
+people =create_people()
+firms_init(firm_list, people)
 
+people_init(people)
 
-Firm.get_used_firm_ids_pool()
-create_postiton_names()
-people = people_init()
 lsd = LastSimDate()
 session.add(lsd)
 session.commit()

@@ -6,7 +6,9 @@ from random import randint, random, choice
 from sqlalchemy.orm import relationship
 
 import settings
-from settings import (get_anno, YEAR_LENGTH)
+from settings import (get_anno,
+                      YEAR_LENGTH,
+                      UNEMPLOYED)
 
 
 
@@ -16,12 +18,15 @@ Base = declarative_base()
 class Position():
     PROGRESSION = 2  # основание степени (тружность получения повышения растет по степенному закону в завистмости от должности)
 
-    CAP = len(settings.position_names) - 1
+    CAP = len(settings.position_names)
 
-    def __init__(self, ses, human):
+    def __init__(self, ses, human, initial_position = None):
         self.session = ses
         self.human = human
-        self.__position = 1  if self.human.start_work is None else 2
+        if initial_position is None:
+            self.__position = 1  if self.human.start_work is None else 2
+        else:
+            self.__position = initial_position
 
     @property
     def position(self):
@@ -110,9 +115,18 @@ class Firm(Base):
         self.last_rating = self.new_rating()
         self.open_date = get_anno()
 
+
     @classmethod
     def bind_session(cls, session):
         cls.session = session
+
+    def assign_director(self, director ):
+        # если это не фейковая фирма для безработных, назначаем директора
+        print('=========================================')
+        print(f'идентификатор фирмы {self.id} идентификатор директора {director.id}')
+        if self.firmname_id != UNEMPLOYED:
+            director.assign(firm_id=self.id, pos_id=Position.CAP)
+
 
     @classmethod
     def get_rand_firm_id(cls):
@@ -120,7 +134,7 @@ class Firm(Base):
         return choice(pool)[0]
 
     @classmethod
-    def get_used_firm_ids_pool(cls):
+    def get_used_firmname_ids_pool(cls):
         pool = cls.session.query(FirmName.id).filter(FirmName.used==True).all()
         return pool
 
@@ -135,8 +149,9 @@ class Firm(Base):
     def mark_firmname_as_used(cls, new_id):
         cls.session.query(FirmName).filter(FirmName.id == new_id).update({'used':True})
 
-    def assign(self):
-        Firm.session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
+    def assign(self, director):
+        self.assign_director(director)
+
 
 
     def update(self):
@@ -149,10 +164,25 @@ class Firm(Base):
     def update_rating(self):
         r = self.last_rating + randint(-4, 4)
         self.last_rating = max(0, r)
-        self.assign()
+        Firm.session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
 
     def __repr__(self):
-        return f'<id:{self.id} "{self.firmname.name}"  рейтинг: {self.last_rating}>'
+        if self.id == UNEMPLOYED:
+            return f'<id:{self.id} "{self.firmname.name}"  рейтинг: {self.last_rating}>'
+        else:
+            director_id = (Firm.session.query(Firm).
+                           join(PeopleFirm)
+                           .filter(PeopleFirm.people_id==8)
+                           .order_by(PeopleFirm.move_to_firm_date.desc())
+                           .first())
+            director_id = (Firm.session.query(PeopleFirm.people_id).
+                           join(Firm)
+                           .filter(PeopleFirm.people_id==8, Firm.id == self.id)
+                           .order_by(PeopleFirm.move_to_firm_date.desc())
+                           .first())
+
+            print(f'{director_id=}\n')
+            return f'<id:{self.id} "{self.firmname.name}" ID директора: {director_id} рейтинг: {self.last_rating}>'
 
 class FirmName(Base):
     __tablename__ = 'firmnames'
