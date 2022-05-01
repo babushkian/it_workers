@@ -303,12 +303,14 @@ def directors_migrations2():
     print('То же самое, что в проедыдущей функции но без использования подзапроса')
     print('------------------')
     print('Идентификаторы директоров:')
+
     y = session.query(PeoplePosition.people_id).filter(PeoplePosition.position_id== Position.CAP).all()
     print(y)
     # без подзапроса
     x = (session.query(PeopleFirm, PeoplePosition)
          .join(PeoplePosition, PeopleFirm.people_id == PeoplePosition.people_id)
-         .filter(PeoplePosition.position_id==Position.CAP)
+         # челвоек является директором и не нужно учитывать записи о переходе в фирмы до той даты, как он стал директором
+         .filter(PeoplePosition.position_id==Position.CAP, PeoplePosition.move_to_position_date <= PeopleFirm.move_to_firm_date)
          .order_by(PeopleFirm.id, PeopleFirm.firm_id).all()
 
          )
@@ -317,7 +319,14 @@ def directors_migrations2():
         print(f'{i.PeopleFirm.id=:3d} {i.PeoplePosition.id=:3d} | {i.PeopleFirm.firm_id:3d} | {i.PeopleFirm.people_id=:3d}  {i.PeoplePosition.position_id=:3d}  {i.PeoplePosition.move_to_position_date} {i.PeopleFirm.move_to_firm_date}')
 
 
-
+def show_directors_with_dates():
+    print('\nСписок директоров и даты их назначения')
+    x = (session.query(PeoplePosition)
+         .filter(PeoplePosition.position_id==Position.CAP)
+         .order_by(PeoplePosition.move_to_position_date).all()
+         )
+    for i in x:
+        print(f'id:{i.people_id}, date: {i.move_to_position_date}')
 
 # all_people_count()
 # mean_qualification()
@@ -336,8 +345,48 @@ def directors_migrations2():
 # average_death_age_dumb()
 # average_death_age()
 # annual_avg_age()
-directors_migrations()
+# directors_migrations()
 directors_migrations2()
+show_directors_with_dates()
+
+print('\nНовооткрытые фирмы')
+x = (session.query(Firm)
+     .filter(Firm.open_date>'2010-01-01')
+     .order_by(Firm.open_date).all()
+     )
+for i in x:
+    print(f'id:{i.id}, date: {i.open_date}')
+
+print('\nНАзначение директоров')
+x = (session.query(PeoplePosition)
+     .filter(PeoplePosition.position_id == Position.CAP, PeoplePosition.move_to_position_date>'2010-01-01')
+     .order_by(PeoplePosition.move_to_position_date).all()
+     )
+for i in x:
+    print(f'id:{i.people_id}, date: {i.move_to_position_date}')
+
+print('\n Карьерная история директоров')
+y = (session.query(PeoplePosition.people_id)
+     .filter(PeoplePosition.position_id == Position.CAP, PeoplePosition.move_to_position_date>'2010-01-01')
+     )
+x = (session.query(PeoplePosition)
+     .filter(PeoplePosition.people_id.in_(y))
+     .order_by(PeoplePosition.people_id, PeoplePosition.move_to_position_date)
+     )
+print(x)
+x = x.all()
+for i in x:
+    print(f'id:{i.people_id:3d}, position: {i.position_id:3d},  date: {i.move_to_position_date}')
+
+print('\nВ каких фирмах работали директора')
+x = (session.query(PeopleFirm)
+     .filter(PeopleFirm.people_id.in_(y))
+     .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
+     .all()
+     )
+for i in x:
+    print(f'id:{i.people_id:3d}, firm: {i.firm_id:3d},  date: {i.move_to_firm_date}')
+
 
 # самый старый живой человек. Надо считать тсходя из того, умер о или нет. Если не умер, то дату
 # рождения отнимаем от плсоедней даты симуляции
