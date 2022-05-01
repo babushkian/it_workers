@@ -14,7 +14,7 @@ from model.worker_base import (PosBase,
                                FirmName,
                                FirmRating
                                )
-
+from settings import UNEMPLOYED
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -301,6 +301,7 @@ def directors_migrations2():
     print('------------------')
     print('Все переходы директоров из одной фирмы в другую:')
     print('То же самое, что в проедыдущей функции но без использования подзапроса')
+    print('Не совсем то же, отсеены те записи о людях, когда они еще не были директорами')
     print('------------------')
     print('Идентификаторы директоров:')
 
@@ -328,6 +329,83 @@ def show_directors_with_dates():
     for i in x:
         print(f'id:{i.people_id}, date: {i.move_to_position_date}')
 
+
+def history_of_directors():
+    print('\nНовооткрытые фирмы')
+    x = (session.query(Firm)
+         .filter(Firm.open_date > '2010-01-01')
+         .order_by(Firm.open_date).all()
+         )
+    for i in x:
+        print(f'id:{i.id}, date: {i.open_date}')
+
+    print('\nНАзначение директоров')
+    x = (session.query(PeoplePosition)
+         .filter(PeoplePosition.position_id == Position.CAP, PeoplePosition.move_to_position_date > '2010-01-01')
+         .order_by(PeoplePosition.move_to_position_date).all()
+         )
+    for i in x:
+        print(f'id:{i.people_id}, date: {i.move_to_position_date}')
+
+    print('\n Карьерная история директоров')
+    y = (session.query(PeoplePosition.people_id)
+         .filter(PeoplePosition.position_id == Position.CAP, PeoplePosition.move_to_position_date > '2010-01-01')
+         )
+    x = (session.query(PeoplePosition)
+         .filter(PeoplePosition.people_id.in_(y))
+         .order_by(PeoplePosition.people_id, PeoplePosition.move_to_position_date)
+         )
+    print(x)
+    x = x.all()
+    for i in x:
+        print(f'id:{i.people_id:3d}, position: {i.position_id:3d},  date: {i.move_to_position_date}')
+
+    print('\nВ каких фирмах работали директора')
+    x = (session.query(PeopleFirm)
+         .filter(PeopleFirm.people_id.in_(y))
+         .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
+         .all()
+         )
+    for i in x:
+        print(f'id:{i.people_id:3d}, firm: {i.firm_id:3d},  date: {i.move_to_firm_date}')
+
+def retired_directors():
+    print('\nОтошедшие от дел директора')
+
+    x = (session.query(People)
+             .join(PeoplePosition)
+             .filter(PeoplePosition.position_id==Position.CAP)
+             .filter(People.retire_date != None)
+         )
+    print(x)
+    x = x.all()
+    for i in x:
+        print(f'id:{i.id}')
+
+def firms_without_directors():
+    dir_ids = (session.query(PeoplePosition.people_id, PeoplePosition.move_to_position_date)
+             .filter(PeoplePosition.position_id==Position.CAP).subquery()
+               )
+
+    print(dir_ids)
+
+    ret_dirs = (session.query(PeopleFirm.people_id)
+                .join(dir_ids, PeopleFirm.people_id == dir_ids.c.people_id)
+                # дата назначения на должность директора в фирме должна быть ранеьше даты ухода из фирмы
+                .filter( dir_ids.c.move_to_position_date < PeopleFirm.move_to_firm_date)
+                )
+
+    print(type(ret_dirs))
+    firms_with_ret_dirs = (session.query(PeopleFirm)
+                           .filter(PeopleFirm.people_id.in_(ret_dirs))
+                           .filter(PeopleFirm.firm_id != UNEMPLOYED)
+                           )
+    print(type(firms_with_ret_dirs))
+
+
+    for i in firms_with_ret_dirs:
+        print(i.people_id, i.firm_id, i.move_to_firm_date)
+
 # all_people_count()
 # mean_qualification()
 # talent_mean_qualification()
@@ -346,48 +424,11 @@ def show_directors_with_dates():
 # average_death_age()
 # annual_avg_age()
 # directors_migrations()
-directors_migrations2()
-show_directors_with_dates()
-
-print('\nНовооткрытые фирмы')
-x = (session.query(Firm)
-     .filter(Firm.open_date>'2010-01-01')
-     .order_by(Firm.open_date).all()
-     )
-for i in x:
-    print(f'id:{i.id}, date: {i.open_date}')
-
-print('\nНАзначение директоров')
-x = (session.query(PeoplePosition)
-     .filter(PeoplePosition.position_id == Position.CAP, PeoplePosition.move_to_position_date>'2010-01-01')
-     .order_by(PeoplePosition.move_to_position_date).all()
-     )
-for i in x:
-    print(f'id:{i.people_id}, date: {i.move_to_position_date}')
-
-print('\n Карьерная история директоров')
-y = (session.query(PeoplePosition.people_id)
-     .filter(PeoplePosition.position_id == Position.CAP, PeoplePosition.move_to_position_date>'2010-01-01')
-     )
-x = (session.query(PeoplePosition)
-     .filter(PeoplePosition.people_id.in_(y))
-     .order_by(PeoplePosition.people_id, PeoplePosition.move_to_position_date)
-     )
-print(x)
-x = x.all()
-for i in x:
-    print(f'id:{i.people_id:3d}, position: {i.position_id:3d},  date: {i.move_to_position_date}')
-
-print('\nВ каких фирмах работали директора')
-x = (session.query(PeopleFirm)
-     .filter(PeopleFirm.people_id.in_(y))
-     .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
-     .all()
-     )
-for i in x:
-    print(f'id:{i.people_id:3d}, firm: {i.firm_id:3d},  date: {i.move_to_firm_date}')
-
-
+# directors_migrations2()
+# show_directors_with_dates()
+history_of_directors()
+retired_directors()
+# firms_without_directors() # не заработала как надо
 # самый старый живой человек. Надо считать тсходя из того, умер о или нет. Если не умер, то дату
 # рождения отнимаем от плсоедней даты симуляции
 # ежегодный отчет по количеству сотрудников в фирмах

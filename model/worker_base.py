@@ -119,10 +119,13 @@ class Firm(Base):
     recent_emploees = relationship('People', back_populates='recent_firm')
     people = relationship('PeopleFirm', back_populates='firm_conn')
 
+    obj_people = None
+
     def __init__(self, n):
         self.firmname_id = n
         self.last_rating = self.new_rating()
         self.open_date = get_anno()
+        self.director = None
 
 
     @classmethod
@@ -131,14 +134,27 @@ class Firm(Base):
 
     def assign_director(self, director: 'People'):
         # если это не фейковая фирма для безработных, назначаем директора
-        print('=========================================')
-        print(f'идентификатор фирмы {self.id} идентификатор директора {director.id}')
+        # print('=========================================')
+        # print(f'идентификатор фирмы {self.id} идентификатор директора {director.id}')
         if self.id != UNEMPLOYED:
+            self.director = director
             director.migrate(firm_id=self.id)
             director.migrate_record()
             director.pos.become_director()
             director.change_position_record()
 
+    def assign_new_director(self):
+        candidats = [i for i in Firm.obj_people if i.current_firm_id == self.id]
+        candidats.sort(key = lambda x: 2*x.pos.position + x.talent, reverse=True)
+        print('========================')
+        print(f'в фриме {self.id} {self.firmname.name} смена руководства')
+        print('Кандидаты на поста директора:')
+        for i in candidats:
+            print(f'id: {i.id:3d} position:{i.pos.position:3d} talent: {i.talent:3d}')
+        self.director = candidats[0]
+        print(f'Новый директор: {self.director}')
+        self.director.pos.become_director()
+        self.director.change_position_record()
 
     @classmethod
     def get_rand_firm_id(cls):
@@ -169,6 +185,8 @@ class Firm(Base):
     def update(self):
         if get_anno().day == 1 and get_anno().month == 1:
             self.update_rating()
+        if self.id != UNEMPLOYED and self.director is None:
+            self.assign_new_director()
 
     def  new_rating(self):
         return randint(10, 40)
@@ -179,17 +197,7 @@ class Firm(Base):
         Firm.session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
 
     def __repr__(self):
-        if self.id == UNEMPLOYED:
-            return f'<id:{self.id} "{self.firmname.name}"  рейтинг: {self.last_rating}>'
-        else:
-            director_id = (Firm.session.query(PeopleFirm.people_id).
-                           join(Firm)
-                           .filter(PeopleFirm.people_id==8, Firm.id == self.id)
-                           .order_by(PeopleFirm.move_to_firm_date.desc())
-                           .first())
-
-            print(f'{director_id=}\n')
-            return f'<id:{self.id} "{self.firmname.name}" ID директора: {director_id} рейтинг: {self.last_rating}>'
+        return f'<id:{self.id} "{self.firmname.name}"  рейтинг: {self.last_rating}>'
 
 class FirmName(Base):
     __tablename__ = 'firmnames'

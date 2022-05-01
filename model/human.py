@@ -42,6 +42,8 @@ class People(Base):
     position_name = relationship('PosBase', innerjoin=True)
     worked_in_firms = relationship('PeopleFirm', back_populates='human_conn')
 
+    obj_firms = None
+
     # дата начала работы
     # стаж. От него зависит вероятность продвижения по карьерной лестнице
     # карьерная лестница: несколько ступеней, вероятность продвиджения на следуюшую ступень меньше,
@@ -115,7 +117,7 @@ class People(Base):
         else:
             treshold =  (self.age + 1 - RETIREMENT_MIN_AGE)/(RETIREMENT_DELTA*YEAR_LENGTH)
             if random() < treshold:
-                print('Retired')
+                print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Retired')
                 self.set_retired()
                 return True
             else:
@@ -130,18 +132,28 @@ class People(Base):
         else: # Есть возможность умереть
             treshold = (self.age - DEATH_MIN_AGE)/(18*DEATH_DELTA*YEAR_LENGTH)
             if random() < treshold: # повезло, умер
-                print('Dead')
+                print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Dead')
                 self.set_dead()
                 return True
             else:
                 return False
 
+    def director_retired(self):
+        print(f'старый директор id {self.id:3d} ушел из фирмы {self.current_firm_id:3d}')
+        for f in People.obj_firms:
+            if f.id == self.current_firm_id:
+                f.director = None
+                break
+
     def set_retired(self):
+        if self.pos.position == Position.CAP:
+            self.director_retired()
         self.current_firm_id = UNEMPLOYED
         self.pos.set_position(UNEMPLOYED)
         self.retire_date = get_anno()
         self.migrate_record()
         self.change_position_record()
+
 
     def set_dead(self):
         self.death_date = get_anno()
@@ -180,8 +192,6 @@ class People(Base):
             move_to_position_date=get_anno()))
 
     def migrate_record(self):
-        print('--------------- \n\tзапись о переходе в другую фирму')
-        print(f'\t{get_anno()} человек {self.id} с должностью {self.pos.position} уходит в фирму {self.current_firm_id}')
         self.session.add(PeopleFirm(
             people_id=self.id,
             firm_id=self.current_firm_id,

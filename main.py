@@ -127,12 +127,15 @@ def assign_people_to_firms(people):
 create_postiton_names()
 
 firm_list = create_all_firms()
+
+People.obj_firms = firm_list
 people =create_people()
 people_init(people) # превоначальная инициация, все безработные
 
 for i in people:
     assert i.pos is not None, f'у человека {i.id} не инициирована позиция'
 
+Firm.obj_people = people
 firms_init(firm_list, people)
 assign_people_to_firms(people) # после того, как закрепили за фирмами директоров, устраиваем на работу всех остальных
 
@@ -149,7 +152,7 @@ for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     for p in people:
         p.update()
 
-    if len(firm_list) <16 and  random.random() < (1/60): # не больше 16 фирм
+    if len(firm_list) <21 and  random.random() < (1/70):
         print('создана новая фирма')
         f = create_firm()
         init_firm(f, people)
