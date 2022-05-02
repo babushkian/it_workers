@@ -5,20 +5,6 @@ import random
 random.seed(667)
 
 
-import settings
-from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
-                        INITIAL_PEOPLE_NUMBER,
-                        INITIAL_FIRM_NUMBER,
-                        UNEMPLOYED
-                      )
-from model.worker_base import (Base,
-                               LastSimDate,
-                               PosBase,
-                               Firm, FirmName,
-                               Position
-                               )
-from model.human import People
-
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -31,6 +17,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 # engine = create_engine(f"sqlite:///workers.db", echo=True)
 engine = create_engine(f"sqlite:///workers.db", echo=False)
+from model import Base, bind_session
 
 # удаляем все таблицы, чтобы введенные прежде данные не мешали
 Base.metadata.drop_all(engine)
@@ -38,6 +25,26 @@ Base.metadata.drop_all(engine)
 Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
+
+
+bind_session(session)
+
+import settings
+from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
+                        INITIAL_PEOPLE_NUMBER,
+                        INITIAL_FIRM_NUMBER,
+                        UNEMPLOYED
+                      )
+from model.worker_base import (
+                               LastSimDate,
+                               PosBase,
+                               FirmName,
+                               Position
+                               )
+from model.firm import Firm
+from model.human import People
+
+
 
 # создаем все таблицы
 Base.metadata.create_all(engine)
@@ -61,7 +68,6 @@ def create_all_firms() -> list[ Firm]:
     session.flush()
     del firmname_list
 
-    Firm.bind_session(session)
     # фейковая фирма для безработных
     # такая же, как и все остальные, просто ее особо отслеживать надо
     # первой делаем фирму с первым названием в списке имен фирм
@@ -128,7 +134,6 @@ create_postiton_names()
 
 firm_list = create_all_firms()
 
-People.bind_session(session)
 People.obj_firms = firm_list
 people =create_people()
 people_init(people) # превоначальная инициация, все безработные

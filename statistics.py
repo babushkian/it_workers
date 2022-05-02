@@ -5,16 +5,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, joinedload
 from sqlalchemy.sql import func, distinct, exists, or_
 from pathlib import Path
-from model.human import People
-from model.worker_base import (PosBase,
-                               LastSimDate,
-                               Firm,
-                               PeopleFirm, PeoplePosition,
-                               Position,
-                               FirmName,
-                               FirmRating
-                               )
-from settings import UNEMPLOYED
+from model import Base, bind_session
+
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -32,8 +24,18 @@ engine = create_engine(f"sqlite:///{basefile}", echo=False)
 Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
+bind_session(session)
 
-Firm.bind_session(session)
+from model.human import People
+from model.worker_base import (PosBase,
+                               LastSimDate,
+                               PeopleFirm, PeoplePosition,
+                               Position,
+                               FirmName,
+                               FirmRating
+                               )
+from model.firm import Firm
+from settings import UNEMPLOYED
 
 
 def all_people_count():
