@@ -103,7 +103,7 @@ def create_people()->list[People]:
     '''
     people = list()
     for i in range(INITIAL_PEOPLE_NUMBER):
-        people.append(People(session))
+        people.append(People())
     session.add_all(people)
     session.flush()
     session.commit()
@@ -128,6 +128,7 @@ create_postiton_names()
 
 firm_list = create_all_firms()
 
+People.bind_session(session)
 People.obj_firms = firm_list
 people =create_people()
 people_init(people) # превоначальная инициация, все безработные

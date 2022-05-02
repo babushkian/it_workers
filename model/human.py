@@ -24,6 +24,7 @@ from settings import (get_birthday,
 
 
 class People(Base):
+    session = None
     __tablename__ = 'people'
     id = Column(Integer, primary_key=True)
     first_name = Column(String(50))
@@ -50,8 +51,7 @@ class People(Base):
     # чем на предыдущую
     # талант: влияет на вероятность повышения и на вероятность понижения
 
-    def __init__(self, ses):
-        self.session = ses
+    def __init__(self):
         self.first_name = choice(settings.first_name)  #
         self.second_name = choice(settings.second_name)  #
         self.last_name = choice(settings.last_name)  #
@@ -61,6 +61,10 @@ class People(Base):
         # изначально человек не имеет никакой должности Инициализируется, чтобы в методе assign
         # проверять, не привоена ли ему уже должность (директор фирмы)
         self.pos = None
+
+    @classmethod
+    def bind_session(cls, session):
+        cls.session = session
 
     def assign(self, firm_id: Optional[int]=None, pos_id: Optional[int]=None):
         '''
@@ -72,7 +76,7 @@ class People(Base):
         anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
         if anniversary_20 <= get_anno():
             self.start_work =  anniversary_20
-        self.pos = Position(self.session, self, UNEMPLOYED)
+        self.pos = Position(self, UNEMPLOYED)
         # self.change_position_record()
         self.current_firm_id = UNEMPLOYED
         # self.migrate_record()
@@ -186,13 +190,13 @@ class People(Base):
 
     def change_position_record(self):
         self.last_position_id = self.pos.position
-        self.session.add(PeoplePosition(
+        People.session.add(PeoplePosition(
             people_id=self.id,
             position_id=self.pos.position,
             move_to_position_date=get_anno()))
 
     def migrate_record(self):
-        self.session.add(PeopleFirm(
+        People.session.add(PeopleFirm(
             people_id=self.id,
             firm_id=self.current_firm_id,
             move_to_firm_date=get_anno()))
@@ -210,7 +214,7 @@ class People(Base):
             if self.pos.position < Position.CAP:
                 targ = Firm.get_rand_firm_id()
                 if self.current_firm_id != targ:
-                    targ_firm_rating = self.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
+                    targ_firm_rating = People.session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
                     attraction_mod = targ_firm_rating - self.recent_firm.last_rating
                     chanse = (40 + attraction_mod) / (40 * 365)
                     if random() < chanse:

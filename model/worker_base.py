@@ -21,8 +21,8 @@ class Position():
 
     CAP = len(settings.position_names)
 
-    def __init__(self, ses, human: 'People', initial_position:  Optional[int] = None):
-        self.session = ses
+    def __init__(self, human: 'People', initial_position:  Optional[int] = None):
+
         self.human = human
         if initial_position is None:
             self.__position = 1
@@ -47,7 +47,7 @@ class Position():
 
     @property
     def posname(self):
-        pos = self.session.query(PosBase.name).filter(PosBase.id == self.__position).scalar()
+        pos = Firm.session.query(PosBase.name).filter(PosBase.id == self.__position).scalar()
         return pos
 
     # повышение по службе
