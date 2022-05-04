@@ -26,6 +26,7 @@ Session.configure(bind=engine)
 session = Session()
 bind_session(session)
 
+from model.status import StatusName, PeopleStatus
 from model.human import People
 from model.worker_base import (PosBase,
                                LastSimDate,
@@ -425,6 +426,33 @@ def firms_without_directors():
     for i in firms_with_ret_dirs:
         print(i.people_id, i.firm_id, i.move_to_firm_date)
 
+def status_distriburion():
+    x = (session.query(PeopleStatus)
+             .join(StatusName)
+             .filter(PeopleStatus.people_id >75)
+             .order_by(PeopleStatus.people_id, PeopleStatus.status_date)
+             .all()
+         )
+    for i in x:
+        print(i.people_id,  i.status_name.name, i.status_date)
+
+def status_distriburion_2():
+    y = (session.query(PeopleStatus.people_id)
+         .group_by(PeopleStatus.people_id)
+         .having(func.count(PeopleStatus.people_id)>2)
+
+        )
+    print(y)
+
+    x = (session.query(PeopleStatus)
+             .join(StatusName)
+             .filter(PeopleStatus.people_id.in_(y))
+             .order_by(PeopleStatus.people_id, PeopleStatus.status_date)
+             .all()
+         )
+    for i in x:
+        print(i.people_id,  i.status_name.name, i.status_date)
+
 # all_people_count()
 # mean_qualification()
 # talent_mean_qualification()
@@ -448,6 +476,7 @@ def firms_without_directors():
 # history_of_directors()
 # retired_directors()
 # firms_without_directors() # не заработала как надо
-
+# status_distriburion()
+status_distriburion_2()
 # ежегодный отчет по количеству сотрудников в фирмах
 # как часто люди переходят из одной фирмы в другую?

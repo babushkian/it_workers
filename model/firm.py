@@ -37,6 +37,7 @@ class Firm(Base):
         if self.id != UNEMPLOYED:
             self.director = director
             director.migrate(firm_id=self.id)
+            director.status.set_status_employed()
             director.migrate_record()
             director.pos.become_director()
             director.change_position_record()

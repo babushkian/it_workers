@@ -8,11 +8,12 @@ from sqlalchemy.orm import relationship
 
 from model import Base, session
 import settings
+from model.status import Status, StatHandle, StatusName, PeopleStatus
 from model.worker_base import (
                                Position,
                                PeoplePosition,
                                PeopleFirm,
-                               LastSimDate)
+                               )
 from model.firm import Firm
 from settings import (get_birthday,
                       get_anno,
@@ -60,6 +61,7 @@ class People(Base):
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
         # изначально человек не имеет никакой должности Инициализируется, чтобы в методе assign
         # проверять, не привоена ли ему уже должность (директор фирмы)
+        self.status = None
         self.pos = None
 
 
@@ -69,6 +71,7 @@ class People(Base):
         но из инита People сделать запись в нее нельзя, та как у People  в этот момент еще не определен id
         '''
         # как только человеку исполняется 20 лет, он начинает работать
+        self.status = StatHandle(self)
         y = self.birth_date.year + 20
         anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
         if anniversary_20 <= get_anno():
@@ -77,7 +80,6 @@ class People(Base):
         # self.change_position_record()
         self.pred_firm_id = UNEMPLOYED
         self.current_firm_id = UNEMPLOYED
-        # self.migrate_record()
 
     def assign_to_firm(self, firm_id):
         if firm_id:
@@ -86,6 +88,10 @@ class People(Base):
             self.set_current_firm_id(Firm.get_rand_firm_id())
         self.migrate_record()
         self.pos.become_worker()  # повышаем с безработного жо первой ступени работника
+        if self.current_firm_id ==UNEMPLOYED:
+            self.status.set_status_unemployed()
+        else:
+            self.status.set_status_employed()
         self.change_position_record()
 
     def unemployed_to_worker(self, firm_id=None):
@@ -94,7 +100,8 @@ class People(Base):
             # записи о директорах уже сделаны ранее, теперь надо занести работяг
             if self.current_firm_id == UNEMPLOYED:
                 self.assign_to_firm(firm_id)
-        else: #  осталась молодежь - записываем, что она не работает
+        else: #  осталась молодежь - записываем, что она не
+            self.status.set_status_young()
             self.migrate_record()
             self.change_position_record()
 
@@ -156,6 +163,8 @@ class People(Base):
             self.director_retired()
         self.set_current_firm_id(UNEMPLOYED)
         self.pos.set_position(UNEMPLOYED)
+        if self.status.status != Status.DEAD:
+            self.status.set_status_retired()
         self.retire_date = get_anno()
         self.migrate_record()
         self.change_position_record()
@@ -163,6 +172,7 @@ class People(Base):
 
     def set_dead(self):
         self.death_date = get_anno()
+        self.status.set_status_dead()
         if self.retire_date is None:
             self.set_retired()
 

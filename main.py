@@ -33,6 +33,8 @@ from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
                         INITIAL_FIRM_NUMBER,
                         UNEMPLOYED
                       )
+
+from model.status import Status, statnames, StatusName, PeopleStatus
 from model.worker_base import (
                                LastSimDate,
                                PosBase,
@@ -102,6 +104,10 @@ def create_postiton_names():
         session.add(PosBase(name = i))
     session.commit()
 
+def create_staus_names():
+    for i in Status:
+        session.add(StatusName(id=i.value, name=statnames[i]))
+    session.commit()
 
 def create_people()->list[People]:
     '''
@@ -131,6 +137,7 @@ def assign_people_to_firms(people):
 
 
 create_postiton_names()
+create_staus_names()
 
 firm_list = create_all_firms()
 
