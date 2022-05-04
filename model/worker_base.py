@@ -88,9 +88,10 @@ class PeopleFirm(Base):
     __tablename__ = 'people_firms'
     id = Column(Integer, primary_key=True)
     people_id = Column(Integer, ForeignKey('people.id'))
-    firm_id = Column(Integer, ForeignKey('firms.id'))
+    firm_from_id = Column(Integer)
+    firm_to_id = Column(Integer, ForeignKey('firms.id'))
     move_to_firm_date = Column(Date, index=True)
-    __table_args__ = (Index('ix_people_firms_people_id_firm_id', people_id, firm_id),)
+    __table_args__ = (Index('ix_people_firms_people_id_firm_id', people_id, firm_from_id, firm_to_id),)
     human_conn = relationship('People', back_populates='worked_in_firms')
     firm_conn = relationship('Firm', back_populates='people')
 

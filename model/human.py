@@ -40,7 +40,7 @@ class People(Base):
 
     recent_firm = relationship('Firm', back_populates='recent_emploees')
     # у человека всегда есть позиция, поэтому LEFT OUTER JOIN не требуется
-    position_name = relationship('PosBase', innerjoin=True)
+    position_name = relationship('PosBase',  uselist = False, innerjoin=True)
     worked_in_firms = relationship('PeopleFirm', back_populates='human_conn')
 
     obj_firms = None
@@ -75,14 +75,15 @@ class People(Base):
             self.start_work =  anniversary_20
         self.pos = Position(self, UNEMPLOYED)
         # self.change_position_record()
+        self.pred_firm_id = UNEMPLOYED
         self.current_firm_id = UNEMPLOYED
         # self.migrate_record()
 
     def assign_to_firm(self, firm_id):
         if firm_id:
-            self.self.current_firm_id = firm_id
+            self.set_current_firm_id(firm_id)
         else:
-            self.current_firm_id = Firm.get_rand_firm_id()
+            self.set_current_firm_id(Firm.get_rand_firm_id())
         self.migrate_record()
         self.pos.become_worker()  # повышаем с безработного жо первой ступени работника
         self.change_position_record()
@@ -96,6 +97,10 @@ class People(Base):
         else: #  осталась молодежь - записываем, что она не работает
             self.migrate_record()
             self.change_position_record()
+
+    def set_current_firm_id(self, new_id):
+        self.pred_firm_id = self.current_firm_id
+        self.current_firm_id = new_id
 
     def check_start_work(self, firm_id=None):
         if self.start_work is None:
@@ -149,7 +154,7 @@ class People(Base):
     def set_retired(self):
         if self.pos.position == Position.CAP:
             self.director_retired()
-        self.current_firm_id = UNEMPLOYED
+        self.set_current_firm_id(UNEMPLOYED)
         self.pos.set_position(UNEMPLOYED)
         self.retire_date = get_anno()
         self.migrate_record()
@@ -195,7 +200,8 @@ class People(Base):
     def migrate_record(self):
         session.add(PeopleFirm(
             people_id=self.id,
-            firm_id=self.current_firm_id,
+            firm_from_id=self.pred_firm_id,
+            firm_to_id=self.current_firm_id,
             move_to_firm_date=get_anno()))
 
     def migrate(self, firm_id=None):
@@ -203,7 +209,7 @@ class People(Base):
         Переходим в другую фирму
         '''
         if firm_id is not None: # принудительный переход в конкретную фирму
-            self.current_firm_id = firm_id
+            self.set_current_firm_id(firm_id)
             return True
         else:
             # директору не стоит уходить из своей фирмы
@@ -215,7 +221,7 @@ class People(Base):
                     attraction_mod = targ_firm_rating - self.recent_firm.last_rating
                     chanse = (40 + attraction_mod) / (40 * 365)
                     if random() < chanse:
-                        self.current_firm_id = targ
+                        self.set_current_firm_id(targ)
                         return True
             return False
 

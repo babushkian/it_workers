@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from sqlalchemy import create_engine, event, cast, Date
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy.orm import sessionmaker, joinedload, aliased
 from sqlalchemy.sql import func, distinct, exists, or_
 from pathlib import Path
 from model import Base, bind_session
@@ -108,7 +108,7 @@ def born_after_X_year():
 
 def people_from_firm_X():
     print('-----------------------------')
-    print('Все люди, последним местом работы которых была фирма с id=1')
+    print('Все люди, последним местом работы которых была фирма с id=2')
     print('-----------------------------')
     x = (session.query(People).join(Firm)
          .options(
@@ -116,7 +116,7 @@ def people_from_firm_X():
             joinedload("recent_firm.firmname"), # видимо это свойство еще не объявлено, поэтому не резолвится через атрибут класса
             joinedload(People.position_name),
             )
-         .filter(Firm.id == 1).all()
+         .filter(Firm.id == 2).all()
          )
     for i in x:
         print(i)
@@ -129,7 +129,7 @@ def firm_names_from_human_firms():
     print('сделано через промежутачную таблицу human_firms, а не через таблицу people, что было бы логично')
     print('-----------------------------')
     # сначала выделяем список идентификаторов всех фирм в которых работают выбранные люди
-    y = (session.query(distinct(PeopleFirm.firm_id))
+    y = (session.query(distinct(PeopleFirm.firm_to_id))
          .filter(PeopleFirm.people_id < 11)
          .order_by(PeopleFirm.people_id)
          )
@@ -150,10 +150,14 @@ def ever_worked_in_firm_X():
 
     for i in x:
         print('======================')
-        print(i)
+        print('Люди когда-либо работавшие в перечисленных фирмах')
+        print('Тут не учитывается, что человек мог устраиваться в одну фирму несколько раз ')
+        print('======================')
+        print(i.id, '"', i.firmname.name, '"')
         print('======================')
         for j in i.people: # people_firm вот така последовательность обращений через промеж таблицу
-            print(j.human_conn) # people
+            p = j.human_conn
+            print(f'person id:{p.id:3d} name: {p.last_name:18s} start twork in this firm: {j.move_to_firm_date}')
 
 
 
@@ -181,12 +185,13 @@ def promotion_dates():
     print('-----------------------------')
     print('Даты повышения человека - простой способ, без промежуточной таблицы')
     x = (session.query(PeoplePosition)
-         .filter(PeoplePosition.people_id==50)
-         .order_by(PeoplePosition.move_to_position_date)
+         .filter(PeoplePosition.people_id<8)
+         # .order_by(PeoplePosition.move_to_position_date)
+         .order_by(PeoplePosition.people_id)
          .all()
          )
     for i in x:
-        print(i.position_id, i.move_to_position_date)
+        print(f'pers id:{i.people_id:3d}  position: {i.position_id:3d}  {i.move_to_position_date}')
 
 
     print('-----------------------------')
@@ -194,7 +199,9 @@ def promotion_dates():
     h = (session.query(People, PeoplePosition.position_id, PeoplePosition.move_to_position_date, PosBase.name)
          .join(PeoplePosition, PeoplePosition.people_id == People.id)
          .join(PosBase, PosBase.id == PeoplePosition.position_id)
-         .filter(People.id == 50).all()
+         .filter(People.id<8)
+         .order_by(People.id)
+         .all()
          )
     for i in h:
         print(i.People.first_name, i.People.last_name, i.position_id, i.name, i.move_to_position_date)
@@ -291,12 +298,12 @@ def directors_migrations():
     print(y)
     directors = session.query(PeoplePosition).filter(PeoplePosition.position_id== Position.CAP).subquery()
     # здесь у на сиспользуется связанный подзапрос
-    x = (session.query(PeopleFirm.firm_id, PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
+    x = (session.query(PeopleFirm)
          .join(directors, PeopleFirm.people_id == directors.c.people_id)
-         .order_by(PeopleFirm.move_to_firm_date, PeopleFirm.firm_id).all()
+         .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date).all()
          )
     for i in x:
-        print(i)
+        print(f'pers id: {i.people_id} from firm: {i.firm_from_id} to firm: {i.firm_to_id}  {i.move_to_firm_date}')
 
 
 def directors_migrations2():
@@ -314,12 +321,12 @@ def directors_migrations2():
          .join(PeoplePosition, PeopleFirm.people_id == PeoplePosition.people_id)
          # челвоек является директором и не нужно учитывать записи о переходе в фирмы до той даты, как он стал директором
          .filter(PeoplePosition.position_id==Position.CAP, PeoplePosition.move_to_position_date <= PeopleFirm.move_to_firm_date)
-         .order_by(PeopleFirm.id, PeopleFirm.firm_id).all()
+         .order_by(PeopleFirm.id, PeopleFirm.firm_to_id).all()
 
          )
 
     for i in x:
-        print(f'{i.PeopleFirm.id=:3d} {i.PeoplePosition.id=:3d} | {i.PeopleFirm.firm_id:3d} | {i.PeopleFirm.people_id=:3d}  {i.PeoplePosition.position_id=:3d}  {i.PeoplePosition.move_to_position_date} {i.PeopleFirm.move_to_firm_date}')
+        print(f'{i.PeopleFirm.id=:3d} {i.PeoplePosition.id=:3d} | {i.PeopleFirm.firm_to_id:3d} | {i.PeopleFirm.people_id=:3d}  {i.PeoplePosition.position_id=:3d}  {i.PeoplePosition.move_to_position_date} {i.PeopleFirm.move_to_firm_date}')
 
 
 def show_directors_with_dates():
@@ -339,15 +346,16 @@ def history_of_directors():
          .order_by(Firm.open_date).all()
          )
     for i in x:
-        print(f'id:{i.id}, date: {i.open_date}')
+        print(f'id:{i.id}  {i.firmname.name:24s} date: {i.open_date}')
 
-    print('\nНАзначение директоров')
-    x = (session.query(PeoplePosition)
+    print('\nНазначение директоров')
+    x = (session.query(PeoplePosition, People)
+        .join(People)
          .filter(PeoplePosition.position_id == Position.CAP, PeoplePosition.move_to_position_date > '2010-01-01')
          .order_by(PeoplePosition.move_to_position_date).all()
          )
     for i in x:
-        print(f'id:{i.people_id}, date: {i.move_to_position_date}')
+        print(f'id:{i.People.id} {i.People.first_name} {i.People.last_name}, {i.People.recent_firm.firmname.name}, date: {i.PeoplePosition.move_to_position_date}')
 
     print('\n Карьерная история директоров')
     y = (session.query(PeoplePosition.people_id)
@@ -362,14 +370,23 @@ def history_of_directors():
     for i in x:
         print(f'id:{i.people_id:3d}, position: {i.position_id:3d},  date: {i.move_to_position_date}')
 
-    print('\nВ каких фирмах работали директора')
-    x = (session.query(PeopleFirm)
+    f_from = aliased(Firm, name='firm_from')
+    f_to = aliased(Firm, name='firm_to')
+    x = (session.query(PeopleFirm, f_to, f_from)
+         .join(f_to, f_to.id ==PeopleFirm.firm_to_id)
+         .join(f_from, f_from.id == PeopleFirm.firm_from_id)
          .filter(PeopleFirm.people_id.in_(y))
          .order_by(PeopleFirm.people_id, PeopleFirm.move_to_firm_date)
-         .all()
+
          )
+    print(x.column_descriptions)
+
+    x=x.all()
+    print('\nВ каких фирмах работали директора')
     for i in x:
-        print(f'id:{i.people_id:3d}, firm: {i.firm_id:3d},  date: {i.move_to_firm_date}')
+        print(f'id:{i.PeopleFirm.people_id:3d}, из: {i.firm_from.firmname.name:21s} '
+              f'  в: {i.firm_to.firmname.name:21s}  {i.PeopleFirm.move_to_firm_date}')
+
 
 def retired_directors():
     print('\nОтошедшие от дел директора')
@@ -416,7 +433,7 @@ def firms_without_directors():
 # real_firm_names()
 # born_after_X_year()
 # people_from_firm_X()
-#firm_names_from_human_firms()
+# firm_names_from_human_firms()
 # ever_worked_in_firm_X()
 # people_yonger_than_1970()
 # promotion_dates()
@@ -428,10 +445,9 @@ def firms_without_directors():
 # directors_migrations()
 # directors_migrations2()
 # show_directors_with_dates()
-history_of_directors()
-retired_directors()
+# history_of_directors()
+# retired_directors()
 # firms_without_directors() # не заработала как надо
-# самый старый живой человек. Надо считать тсходя из того, умер о или нет. Если не умер, то дату
-# рождения отнимаем от плсоедней даты симуляции
+
 # ежегодный отчет по количеству сотрудников в фирмах
 # как часто люди переходят из одной фирмы в другую?

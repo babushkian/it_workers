@@ -19,8 +19,6 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 engine = create_engine(f"sqlite:///workers.db", echo=False)
 from model import Base, bind_session
 
-# удаляем все таблицы, чтобы введенные прежде данные не мешали
-Base.metadata.drop_all(engine)
 
 Session = sessionmaker()
 Session.configure(bind=engine)
@@ -44,6 +42,8 @@ from model.worker_base import (
 from model.firm import Firm
 from model.human import People
 
+# удаляем все таблицы, чтобы введенные прежде данные не мешали
+Base.metadata.drop_all(engine)
 
 
 # создаем все таблицы
