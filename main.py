@@ -31,7 +31,6 @@ import settings
 from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
                         INITIAL_PEOPLE_NUMBER,
                         INITIAL_FIRM_NUMBER,
-                        UNEMPLOYED
                       )
 
 from model.status import Status, statnames, StatusName, PeopleStatus
@@ -73,7 +72,7 @@ def create_all_firms() -> list[ Firm]:
     # фейковая фирма для безработных
     # такая же, как и все остальные, просто ее особо отслеживать надо
     # первой делаем фирму с первым названием в списке имен фирм
-    firms_list = [create_firm(name_id=UNEMPLOYED)]
+    firms_list = list()
 
     for _ in range(INITIAL_FIRM_NUMBER):
         # выбираем директора - человека способного работать и не приписанного ни к какой фирме
@@ -89,9 +88,9 @@ def init_firm(firm, people):
     while True:
         director = random.choice(people)
         # трудоспособный и не является директором
-        if director.pos.position != Position.CAP and director.age > 19:
+        if director.age > 19 and director.pos.position != Position.CAP:
             break
-    firm.assign(director)
+    firm.initial_assign_director(director)
 
 def firms_init(firms_list, people):
     for firm in firms_list:
@@ -145,11 +144,12 @@ People.obj_firms = firm_list
 people =create_people()
 people_init(people) # превоначальная инициация, все безработные
 
+# следим за тем, чтобы у каждого человека была должность, даже должность "безработынй"
 for i in people:
     assert i.pos is not None, f'у человека {i.id} не инициирована позиция'
 
 Firm.obj_people = people
-firms_init(firm_list, people)
+firms_init(firm_list, people) # здесь к фирме приписывается деректор из уже инициализированных взрослых безработных людей
 assign_people_to_firms(people) # после того, как закрепили за фирмами директоров, устраиваем на работу всех остальных
 
 lsd = LastSimDate()
@@ -165,7 +165,7 @@ for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     for p in people:
         p.update()
 
-    if len(firm_list) <21 and  random.random() < (1/70):
+    if len(firm_list) <15 and  random.random() < (1/90):
         print('создана новая фирма')
         f = create_firm()
         init_firm(f, people)

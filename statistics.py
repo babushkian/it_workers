@@ -36,7 +36,7 @@ from model.worker_base import (PosBase,
                                FirmRating
                                )
 from model.firm import Firm
-from settings import UNEMPLOYED
+
 
 
 def all_people_count():

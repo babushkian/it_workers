@@ -22,7 +22,7 @@ from settings import (get_birthday,
                       DEATH_DELTA,
                       YEAR_LENGTH,
                       DEATH_MIN_AGE,
-                      UNEMPLOYED,)
+                      UNEMPLOYED_POSITION,)
 
 
 class People(Base):
@@ -34,7 +34,7 @@ class People(Base):
     birth_date = Column(Date, index=True)
     talent = Column(Integer, index=True)
     start_work = Column(Date)
-    current_firm_id = Column(Integer, ForeignKey('firms.id'), default= 1, nullable=False, index=True)
+    current_firm_id = Column(Integer, ForeignKey('firms.id'), default= None,  index=True)
     last_position_id = Column(Integer, ForeignKey('positions.id'),  index=True)
     death_date = Column(Date, index=True)
     retire_date = Column(Date, index=True)
@@ -65,21 +65,39 @@ class People(Base):
         self.pos = None
 
 
-    def assign(self, firm_id: Optional[int]=None, pos_id: Optional[int]=None):
+    def assign(self):
         '''
         при инициации нужно присвоить человеку какую-то должность. Делается это через таблицу people_positions
         но из инита People сделать запись в нее нельзя, та как у People  в этот момент еще не определен id
+        поэтому используется дополнительная процедура инициализации, когда id будет определен.
+        Здесь человек ни к какой фирме не приписывается. Он либо молодой либо безработный
         '''
-        # как только человеку исполняется 20 лет, он начинает работать
         self.status = StatHandle(self)
+        # как только человеку исполняется 20 лет, он начинает работать
         y = self.birth_date.year + 20
         anniversary_20 = date(year = y, month=self.birth_date.month, day=self.birth_date.day)
+        # если на момент начала симуляции, человеу 20 лет или больше, в качестве даты начала работы присваивается дата его двадцатилетия
         if anniversary_20 <= get_anno():
             self.start_work =  anniversary_20
-        self.pos = Position(self, UNEMPLOYED)
-        # self.change_position_record()
-        self.pred_firm_id = UNEMPLOYED
-        self.current_firm_id = UNEMPLOYED
+            self.status.set_status_unemployed()
+        else:
+            self.status.set_status_young()
+        self.pos = Position(self, UNEMPLOYED_POSITION)
+        self.pred_firm_id = None
+        self.current_firm_id = None
+
+    def unemployed_to_worker(self, firm_id=None):
+        '''
+        Вызывается только при инициализации симуляции.
+        Третий этап инициализации человека. фирмы уже созданы, директора к ним приписаны.
+        Теперь нужно оставшихся людей приписать к фирмам, если они достигли рабочего возраста.
+        '''
+        if self.status.status == Status.UNEMPLOYED:
+            self.assign_to_firm(firm_id)
+            print('Устраиваем на работу')
+        else: #  осталась молодежь - записываем, что она не
+            self.migrate_record()
+            self.change_position_record()
 
     def assign_to_firm(self, firm_id):
         if firm_id:
@@ -88,22 +106,9 @@ class People(Base):
             self.set_current_firm_id(Firm.get_rand_firm_id())
         self.migrate_record()
         self.pos.become_worker()  # повышаем с безработного жо первой ступени работника
-        if self.current_firm_id ==UNEMPLOYED:
-            self.status.set_status_unemployed()
-        else:
-            self.status.set_status_employed()
+        self.status.set_status_employed()
         self.change_position_record()
 
-    def unemployed_to_worker(self, firm_id=None):
-        if self.start_work:
-            # трудоспособных безработных надо трудоустроить
-            # записи о директорах уже сделаны ранее, теперь надо занести работяг
-            if self.current_firm_id == UNEMPLOYED:
-                self.assign_to_firm(firm_id)
-        else: #  осталась молодежь - записываем, что она не
-            self.status.set_status_young()
-            self.migrate_record()
-            self.change_position_record()
 
     def set_current_firm_id(self, new_id):
         self.pred_firm_id = self.current_firm_id
@@ -161,8 +166,8 @@ class People(Base):
     def set_retired(self):
         if self.pos.position == Position.CAP:
             self.director_retired()
-        self.set_current_firm_id(UNEMPLOYED)
-        self.pos.set_position(UNEMPLOYED)
+        self.set_current_firm_id(None)
+        self.pos.set_position(UNEMPLOYED_POSITION)
         if self.status.status != Status.DEAD:
             self.status.set_status_retired()
         self.retire_date = get_anno()
@@ -236,7 +241,19 @@ class People(Base):
             return False
 
     def __repr__(self):
-        s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date},' \
-            f' талант:{self.talent} фирма: "{self.recent_firm.firmname.name}' \
-            f'" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
+        s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date},'\
+        f' талант:{self.talent}'
+        s += f'" долж: "{self.position_name.name}"  нач. работы: {self.start_work}'
+
+        if self.retire_date is not None:
+            if self.death_date == self.retire_date:
+                s += f' | скорпостижно скончался: {self.death_date}'
+            else:
+                s += f' | вышел на пенсию: {self.retire_date}'
+                if self.death_date is not None:
+                    s += f' | скончался: {self.death_date}'
+        if self.current_firm_id is not None:
+            s += f' | фирма: "{self.recent_firm.firmname.name}"'
+        else:
+            s += ' | безработный'
         return s

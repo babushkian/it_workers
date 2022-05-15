@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship
 
 from model import Base, session
 from model.worker_base import FirmName, FirmRating
-from settings import get_anno, UNEMPLOYED
+from settings import get_anno
 
 
 class Firm(Base):
@@ -30,24 +30,20 @@ class Firm(Base):
         self.director = None
 
 
-    def assign_director(self, director: 'People'):
-        # если это не фейковая фирма для безработных, назначаем директора
-        # print('=========================================')
-        # print(f'идентификатор фирмы {self.id} идентификатор директора {director.id}')
-        if self.id != UNEMPLOYED:
-            self.director = director
-            director.migrate(firm_id=self.id)
-            director.status.set_status_employed()
-            director.migrate_record()
-            director.pos.become_director()
-            director.change_position_record()
+    def initial_assign_director(self, director: 'People'):
+        self.director = director
+        director.migrate(firm_id=self.id)
+        director.status.set_status_employed()
+        director.migrate_record()
+        director.pos.become_director()
+        director.change_position_record()
 
     def assign_new_director(self):
         candidats = [i for i in Firm.obj_people if i.current_firm_id == self.id]
         candidats.sort(key = lambda x: 2*x.pos.position + x.talent, reverse=True)
         print('========================')
         print(f'в фриме {self.id} {self.firmname.name} смена руководства')
-        print('Кандидаты на поста директора:')
+        print('Кандидаты на пост директора:')
         for i in candidats:
             print(f'id: {i.id:3d} position:{i.pos.position:3d} talent: {i.talent:3d}')
         self.director = candidats[0]
@@ -56,17 +52,26 @@ class Firm(Base):
         self.director.change_position_record()
 
     @staticmethod
-    def get_rand_firm_id():
+    def get_rand_firm_id()->int:
+        '''
+        Возвращает случайный идентификатор работающей(не закрытой) фирмы
+        '''
         pool = session.query(Firm.id).filter(Firm.close_date.is_(None)).all()
         return choice(pool)[0]
 
     @staticmethod
-    def get_used_firmname_ids_pool():
+    def get_used_firmname_ids_pool()->list[int]:
+        '''
+        Возвращает список идетнтификаторов имен фирм, которые уже заняты существующими фирмами
+        '''
         pool = session.query(FirmName.id).filter(FirmName.used==True).all()
         return pool
 
     @staticmethod
-    def get_unused_firmname_id():
+    def get_unused_firmname_id()->int:
+        '''
+        Возвращает случайный идентификатор имени фирмы из списка незанятых
+        '''
         pool = session.query(FirmName.id).filter(FirmName.used==False).all()
         assert len(pool) > 0, 'нет свободных названий фирм'
         new_id = choice(pool)[0]
@@ -74,23 +79,33 @@ class Firm(Base):
 
     @staticmethod
     def mark_firmname_as_used( new_id):
+        '''
+        В таблицу firmname добавляется отметка, что такое имя фирмы занято после создания новой фирмы
+        '''
         session.query(FirmName).filter(FirmName.id == new_id).update({'used':True})
-
-    def assign(self, director:'People'):
-        self.assign_director(director)
 
 
 
     def update(self):
+        '''
+        В первый день года обновляется рейтинг фирмы
+        А так же проверяется, есть ли у фирмы деректор. Если нет, назначается новый
+        '''
         if get_anno().day == 1 and get_anno().month == 1:
             self.update_rating()
-        if self.id != UNEMPLOYED and self.director is None:
+        if self.director is None:
             self.assign_new_director()
 
-    def  new_rating(self):
+    def  new_rating(self)->int:
+        '''
+        Новое значение рейтинга фирмы генерится случайно
+        '''
         return randint(10, 40)
 
     def update_rating(self):
+        '''
+        Изменение рейтинга генерится случайно, и делается запись об изменении рейтинга.
+        '''
         r = self.last_rating + randint(-4, 4)
         self.last_rating = max(0, r)
         session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))

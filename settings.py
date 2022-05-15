@@ -1,8 +1,8 @@
 from random import  randint
 from datetime import datetime, date, timedelta
 from names import firm_names, first_name, second_name, last_name, position_names
-
-SIM_YEARS = 2.3
+from copy import copy
+SIM_YEARS = 2.5
 YEAR_LENGTH = 365
 INITIAL_PEOPLE_NUMBER = 100
 INITIAL_FIRM_NUMBER = 6
@@ -10,8 +10,7 @@ INITIAL_FIRM_NUMBER = 6
 # количество фирм
 COL_FIRM = len(firm_names)
 
-# константа для обозначения id фейковой фирмы для безработных
-UNEMPLOYED = 1
+UNEMPLOYED_POSITION = 1
 
 
 DEATH_MIN_AGE = 30
@@ -21,7 +20,7 @@ DEATH_DELTA = DEATH_MAX_AGE - DEATH_MIN_AGE
 OLDEST_BIRTH_DATE = datetime(1945, 1, 1)
 YONGEST_BIRTH_DATE = datetime(2000, 1, 1)
 BIRTH_RANGE = (YONGEST_BIRTH_DATE - OLDEST_BIRTH_DATE).days
-
+START_DATE = datetime(2010, 1, 1)
 
 RETIREMENT_MIN_AGE = 60
 RETIREMENT_MAX_AGE = 80
@@ -35,7 +34,7 @@ def get_birthday() -> date:
 
 # дата начало симуляции
 
-ANNO = date(2010, 1, 1)
+ANNO = copy(START_DATE)
 
 def time_pass():
     global ANNO
