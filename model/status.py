@@ -77,8 +77,12 @@ class StatHandle():
     def set_status_employed(self):
         self.set_status(Status.EMPLOYED)
 
+    def set_status_ill(self):
+        self.set_status(Status.ILL)
+
     def set_status_retired(self):
         self.set_status(Status.RETIRED)
 
     def set_status_dead(self):
         self.set_status(Status.DEAD)
+

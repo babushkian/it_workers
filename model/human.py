@@ -63,6 +63,8 @@ class People(Base):
         # проверять, не привоена ли ему уже должность (директор фирмы)
         self.status = None
         self.pos = None
+        self.unemp_counter = 0
+        self.ill_counter = 0
 
 
     def assign(self):
@@ -94,16 +96,17 @@ class People(Base):
         '''
         if self.status.status == Status.UNEMPLOYED:
             self.assign_to_firm(firm_id)
-            print('Устраиваем на работу')
         else: #  осталась молодежь - записываем, что она не
             self.migrate_record()
             self.change_position_record()
 
-    def assign_to_firm(self, firm_id):
+    def assign_to_firm(self, firm_id=None):
         if firm_id:
             self.set_current_firm_id(firm_id)
         else:
             self.set_current_firm_id(Firm.get_rand_firm_id())
+        if self.start_work is None:
+            self.start_work = get_anno()
         self.migrate_record()
         self.pos.become_worker()  # повышаем с безработного жо первой ступени работника
         self.status.set_status_employed()
@@ -114,44 +117,32 @@ class People(Base):
         self.pred_firm_id = self.current_firm_id
         self.current_firm_id = new_id
 
-    def check_start_work(self, firm_id=None):
-        if self.start_work is None:
-            # как только человеку исполняется 20 лет, он начинает работать
-            if self.age < 20:
-                return False
-            else:
-                # если человеку больше 19 лет иначе он не работает
-                self.start_work = get_anno()
-                self.assign_to_firm(firm_id)
-                return True
+
+
+    def check_start_work(self):
+        # как только человеку исполняется 20 лет, он переходит в ранг безработного а там и работу найдет
+        if self.age < 20:
+            return False
         else:
             return True
 
+
     def check_retirement(self):
-        if self.retire_date is not None:
-            return True
-        elif self.age < RETIREMENT_MIN_AGE:
+        if self.age < RETIREMENT_MIN_AGE:
                 return False
         else:
             treshold =  (self.age + 1 - RETIREMENT_MIN_AGE)/(RETIREMENT_DELTA*YEAR_LENGTH)
             if random() < treshold:
-                print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Retired')
-                self.set_retired()
                 return True
             else:
                 return False
 
-
     def check_death(self):
-        if self.death_date is not  None: # уже умер
-            return True
-        elif self.age < DEATH_MIN_AGE: # возраст слишком ранний для умирания
+        if self.age < DEATH_MIN_AGE: # возраст слишком ранний для умирания
             return False
         else: # Есть возможность умереть
             treshold = (self.age - DEATH_MIN_AGE)/(18*DEATH_DELTA*YEAR_LENGTH)
             if random() < treshold: # повезло, умер
-                print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Dead')
-                self.set_dead()
                 return True
             else:
                 return False
@@ -164,22 +155,23 @@ class People(Base):
                 break
 
     def set_retired(self):
+        print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Retired')
         if self.pos.position == Position.CAP:
             self.director_retired()
         self.set_current_firm_id(None)
         self.pos.set_position(UNEMPLOYED_POSITION)
-        if self.status.status != Status.DEAD:
-            self.status.set_status_retired()
+        self.status.set_status_retired()
         self.retire_date = get_anno()
         self.migrate_record()
         self.change_position_record()
 
-
     def set_dead(self):
+        print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Dead')
         self.death_date = get_anno()
-        self.status.set_status_dead()
-        if self.retire_date is None:
+        if self.status.status != Status.RETIRED:
             self.set_retired()
+        self.status.set_status_dead()
+
 
     @property
     def age(self):
@@ -193,17 +185,73 @@ class People(Base):
     def experience(self):
         return (get_anno() - self.start_work).days
 
+
+    def check_illness(self):
+        return random() < 1/350
+
+    def check_unemployed(self):
+        return random() < 1 / 800
+
+    def get_illness(self):
+        self.ill_counter = int(1 / (0.13 * random() + 0.008) )
+        print(f'{get_anno()} id: {self.id:3d} заболел. срок болезни: {self.ill_counter} дней')
+        self.status.set_status_ill()
+
+    def go_to_work(self):
+        print(f'{get_anno()} id: {self.id:3d} вылечился')
+        self.status.set_status_employed()
+
+    def get_unemployed(self):
+        self.unemp_counter = int(1 / (0.12 * random() + 0.01) )
+        print(f'{get_anno()} id: {self.id:3d} уволился. сидеть без работы: {self.unemp_counter} дней')
+        self.status.set_status_unemployed()
+        self.pred_firm_id = self.current_firm_id
+        self.current_firm_id = None
+        self.migrate_record()
+
+
     def update(self):
-        if self.check_death() is False:
-            if self.check_retirement() is False:
-                if self.check_start_work():
-                    if self.current_firm_id !=1: # если не безработный, можно повысить
+        # если мертвый ничего не делаем
+        if self.status.status != Status.DEAD:
+            if self.check_death():
+                self.set_dead()
+            if self.status.status != Status.RETIRED:
+                if self.check_retirement():
+                    self.set_retired()
+
+                if self.status.status ==Status.ILL:
+                    self.ill_counter -= 1
+                    if self.ill_counter < 1:
+                        self.go_to_work()
+
+                elif self.status.status == Status.UNEMPLOYED:
+                    self.unemp_counter -= 1
+                    if self.unemp_counter < 1:
+                        self.assign_to_firm()
+                elif self.status.status == Status.EMPLOYED:
+                    # сначала смотрим, не заболел ли человек
+                    # потом проверяемЮ не уволился ли
+                    # если не уволился и не заболел проверяем на повышение и переход в другую фирму
+                    ill  = self.check_illness()
+                    if ill:
+                        self.get_illness()
+                    unemp = False
+                    if not ill:
+                        unemp = self.check_unemployed()
+                        if unemp:
+                            self.get_unemployed()
+                    if not (ill or unemp):
                         promoted = self.pos.promotion(self.talent, self.experience)
                         if promoted:
                             self.change_position_record()
-                    tranfered = self.migrate()
-                    if tranfered:
-                        self.migrate_record()
+                        transfered = self.migrate()
+                        if transfered:
+                            self.migrate_record()
+
+
+                elif self.status.status == Status.YONG:
+                    self.check_start_work()
+                    self.get_unemployed()
 
     def change_position_record(self):
         self.last_position_id = self.pos.position

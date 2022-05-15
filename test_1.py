@@ -56,16 +56,31 @@ def able_people_on_start():
     ppl = session.query(distinct(PeopleStatus.people_id)).filter(PeopleStatus.status_date=='2010-01-01', PeopleStatus.status_id==Status.EMPLOYED)
     ppl_status = (session.query(PeopleStatus)
                   .filter(PeopleStatus.people_id.in_(ppl))
-                  .order_by(PeopleStatus.people_id)
+                  .order_by(PeopleStatus.people_id, PeopleStatus.status_date)
                   .all()
                   )
     for i in ppl_status:
         print(i.people_id, i.status_name.name, i.status_date)
 
+#  поиск людей со статусом безоаботный после инициализации симуляции
+def unemp_after_sin_init():
+    ppl = session.query(PeopleStatus).filter(PeopleStatus.status_date >'2010-01-01', PeopleStatus.status_id==Status.UNEMPLOYED).order_by(PeopleStatus.people_id).all()
+    if len(ppl)==0:
+        print("Нет людей со статусом безработный после инициализации")
+    else:
+        for i in ppl:
+            print(i.people_id, i.status_name.name, i.status_date)
+
+
+
 # проверить есть ли у кого-то на момент генерации статус UNEMPLOYED
 # проверить, что у всех людей со статусом EMPLOYED фирма, к которой они приписаны не равна None
+
+# сделать подсчет трудового опыта с учетом больничных и периодов безработности.
 
 
 
 #young_people()
 able_people_on_start()
+# unemp_after_sin_init()
+
