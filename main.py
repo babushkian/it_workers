@@ -31,6 +31,7 @@ import settings
 from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
                         INITIAL_PEOPLE_NUMBER,
                         INITIAL_FIRM_NUMBER,
+                        POSITION_CAP,
                       )
 
 from model.status import Status, statnames, StatusName, PeopleStatus
@@ -88,7 +89,7 @@ def init_firm(firm, people):
     while True:
         director = random.choice(people)
         # трудоспособный и не является директором
-        if director.age > 19 and director.pos.position != Position.CAP:
+        if director.age > 19 and director.pos.position != POSITION_CAP:
             break
     firm.initial_assign_director(director)
 

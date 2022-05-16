@@ -8,7 +8,8 @@ from sqlalchemy.orm import relationship
 from model import Base, session
 import settings
 from settings import (get_anno,
-                      YEAR_LENGTH)
+                      YEAR_LENGTH,
+                      POSITION_CAP,)
 
 
 
@@ -16,7 +17,6 @@ from settings import (get_anno,
 class Position():
     PROGRESSION = 2  # основание степени (тружность получения повышения растет по степенному закону в завистмости от должности)
 
-    CAP = len(settings.position_names)
 
     def __init__(self, human: 'People', initial_position:  Optional[int] = None):
 
@@ -39,7 +39,7 @@ class Position():
 
     def become_director(self):
         # при начале работы надо сменить позицию с безработного на работника
-        self.__position = Position.CAP
+        self.__position = POSITION_CAP
 
 
     @property
@@ -56,7 +56,7 @@ class Position():
         # зависит от трудового опыта - чем больше стаж человека, тем больше шанс повышения
         # от таланта: чем больше талант, тем легче получит повышение
         # и от занимаемой должности: шанс перейти на следующую ступень в два раза меньше
-        if self.__position < Position.CAP:
+        if self.__position < POSITION_CAP:
             x = random()
             # отнимаю от позиции единицу, чтобы безработные не увеличивали степень в формуле
             base_mod = 1 / (YEAR_LENGTH * Position.PROGRESSION ** (self.__position-1))

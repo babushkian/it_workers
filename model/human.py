@@ -22,7 +22,8 @@ from settings import (get_birthday,
                       DEATH_DELTA,
                       YEAR_LENGTH,
                       DEATH_MIN_AGE,
-                      UNEMPLOYED_POSITION,)
+                      UNEMPLOYED_POSITION,
+                      POSITION_CAP,)
 
 
 class People(Base):
@@ -156,7 +157,7 @@ class People(Base):
 
     def set_retired(self):
         print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Retired')
-        if self.pos.position == Position.CAP:
+        if self.pos.position == POSITION_CAP:
             self.director_retired()
         self.set_current_firm_id(None)
         self.pos.set_position(UNEMPLOYED_POSITION)
@@ -277,7 +278,7 @@ class People(Base):
         else:
             # директору не стоит уходить из своей фирмы
             # если отсутствие работы тоже считать фирмой, то директор даже уволиться не может
-            if self.pos.position < Position.CAP:
+            if self.pos.position < POSITION_CAP:
                 targ = Firm.get_rand_firm_id()
                 if self.current_firm_id != targ:
                     targ_firm_rating = session.query(Firm.last_rating).filter(Firm.id == targ).scalar()

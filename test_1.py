@@ -80,7 +80,7 @@ def unemp_after_sin_init():
 
 
 
-#young_people()
-able_people_on_start()
+young_people()
+# able_people_on_start()
 # unemp_after_sin_init()
 

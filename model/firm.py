@@ -3,9 +3,10 @@ from random import choice, randint
 from sqlalchemy import Column, Integer, ForeignKey, Date
 from sqlalchemy.orm import relationship
 
+import statistics
 from model import Base, session
 from model.worker_base import FirmName, FirmRating
-from settings import get_anno
+from settings import get_anno, POSITION_CAP
 
 
 class Firm(Base):
@@ -25,13 +26,15 @@ class Firm(Base):
 
     def __init__(self, n):
         self.firmname_id = n
-        self.last_rating = self.new_rating()
+        self.last_rating = 24
         self.open_date = get_anno()
         self.director = None
+        self.rating_multiplier = 2.0
 
 
     def initial_assign_director(self, director: 'People'):
         self.director = director
+        self.new_rating()
         director.migrate(firm_id=self.id)
         director.status.set_status_employed()
         director.migrate_record()
@@ -91,7 +94,7 @@ class Firm(Base):
         В первый день года обновляется рейтинг фирмы
         А так же проверяется, есть ли у фирмы деректор. Если нет, назначается новый
         '''
-        if get_anno().day == 1 and get_anno().month == 1:
+        if get_anno().day == 1 and get_anno().month in [3, 6, 9, 12]:
             self.update_rating()
         if self.director is None:
             self.assign_new_director()
@@ -100,14 +103,18 @@ class Firm(Base):
         '''
         Новое значение рейтинга фирмы генерится случайно
         '''
-        return randint(10, 40)
+        self.last_rating = self.director.talent * POSITION_CAP
+        session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
+
+    def close(self):
+        pass
 
     def update_rating(self):
         '''
         Изменение рейтинга генерится случайно, и делается запись об изменении рейтинга.
         '''
-        r = self.last_rating + randint(-4, 4)
-        self.last_rating = max(0, r)
+        workers_rating = [i.pos.position*i.talent for i in Firm.obj_people if i.current_firm_id == self.id]
+        self.last_rating  = statistics.mean(workers_rating)
         session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
 
     def __repr__(self):
