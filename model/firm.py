@@ -29,7 +29,7 @@ class Firm(Base):
         self.last_rating = 24
         self.open_date = get_anno()
         self.director = None
-        self.rating_multiplier = 2.0
+        self.rating_multiplier = 1.0
 
 
     def initial_assign_director(self, director: 'People'):
@@ -46,6 +46,7 @@ class Firm(Base):
         candidats.sort(key = lambda x: 2*x.pos.position + x.talent, reverse=True)
         print('========================')
         print(f'в фриме {self.id} {self.firmname.name} смена руководства')
+        print(f'Всего сотрудников в фирме: {len(candidats)}')
         print('Кандидаты на пост директора:')
         for i in candidats:
             print(f'id: {i.id:3d} position:{i.pos.position:3d} talent: {i.talent:3d}')
@@ -55,12 +56,20 @@ class Firm(Base):
         self.director.change_position_record()
 
     @staticmethod
+    def operating_firms_list()->list[int]:
+        '''
+        возвращает список id фирм, у которых не проставлена дата закрытия, то есть работающих фирм
+        '''
+        pool = session.query(Firm.id).filter(Firm.close_date.is_(None)).all()
+        pool = [i.id for i in pool]
+        return pool
+
+    @staticmethod
     def get_rand_firm_id()->int:
         '''
         Возвращает случайный идентификатор работающей(не закрытой) фирмы
         '''
-        pool = session.query(Firm.id).filter(Firm.close_date.is_(None)).all()
-        return choice(pool)[0]
+        return choice(Firm.operating_firms_list())
 
     @staticmethod
     def get_used_firmname_ids_pool()->list[int]:
@@ -79,6 +88,14 @@ class Firm(Base):
         assert len(pool) > 0, 'нет свободных названий фирм'
         new_id = choice(pool)[0]
         return new_id
+
+
+    @staticmethod
+    def firm_to_migrate_ids(firm_id)->list[int]:
+        pool = Firm.operating_firms_list()
+        if firm_id in pool:
+            pool.remove(firm_id)
+        return pool
 
     @staticmethod
     def mark_firmname_as_used( new_id):
@@ -107,14 +124,23 @@ class Firm(Base):
         session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
 
     def close(self):
-        pass
+        print(f'Фирма {self.firmname.name} закрылась')
+        for i in Firm.obj_people:
+            if i.current_firm_id == self.id:
+                i.get_unemployed()
+        self.close_date = get_anno()
+
 
     def update_rating(self):
         '''
         Изменение рейтинга генерится случайно, и делается запись об изменении рейтинга.
         '''
         workers_rating = [i.pos.position*i.talent for i in Firm.obj_people if i.current_firm_id == self.id]
-        self.last_rating  = statistics.mean(workers_rating)
+        if self.rating_multiplier > 0:
+            self.rating_multiplier *= 0.8
+        if self.rating_multiplier < .05:
+            self.rating_multiplier = 0
+        self.last_rating  = statistics.mean(workers_rating)* (1 + self.rating_multiplier)
         session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
 
     def __repr__(self):

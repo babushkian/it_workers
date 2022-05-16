@@ -59,7 +59,7 @@ def create_firm(name_id=None) -> Firm:
     session.flush()
     return fi
 
-def create_all_firms() -> list[ Firm]:
+def create_all_firms() -> dict[int, Firm]:
     # заполняем таблицу фирм
     # создаем названия фирм
     firmname_list = list()
@@ -73,14 +73,14 @@ def create_all_firms() -> list[ Firm]:
     # фейковая фирма для безработных
     # такая же, как и все остальные, просто ее особо отслеживать надо
     # первой делаем фирму с первым названием в списке имен фирм
-    firms_list = list()
+    firms_dict = dict()
 
     for _ in range(INITIAL_FIRM_NUMBER):
         # выбираем директора - человека способного работать и не приписанного ни к какой фирме
         fi = create_firm()
-        firms_list.append(fi)
+        firms_dict[fi.id] = fi
     session.commit()
-    return firms_list
+    return firms_dict
 
 
 def init_firm(firm, people):
@@ -94,7 +94,7 @@ def init_firm(firm, people):
     firm.initial_assign_director(director)
 
 def firms_init(firms_list, people):
-    for firm in firms_list:
+    for firm in firms_list.values():
         init_firm(firm, people)
     session.commit()
 
@@ -139,9 +139,9 @@ def assign_people_to_firms(people):
 create_postiton_names()
 create_staus_names()
 
-firm_list = create_all_firms()
+firm_dict = create_all_firms()
 
-People.obj_firms = firm_list
+People.obj_firms = firm_dict
 people =create_people()
 people_init(people) # превоначальная инициация, все безработные
 
@@ -150,7 +150,7 @@ for i in people:
     assert i.pos is not None, f'у человека {i.id} не инициирована позиция'
 
 Firm.obj_people = people
-firms_init(firm_list, people) # здесь к фирме приписывается деректор из уже инициализированных взрослых безработных людей
+firms_init(firm_dict, people) # здесь к фирме приписывается деректор из уже инициализированных взрослых безработных людей
 assign_people_to_firms(people) # после того, как закрепили за фирмами директоров, устраиваем на работу всех остальных
 
 lsd = LastSimDate()
@@ -161,16 +161,17 @@ for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     time_pass()
     lsd.date = settings.get_anno()
 
-    for f in firm_list:
-        f.update()
+    for f in firm_dict.values():
+        if f.close_date is None:
+            f.update()
     for p in people:
         p.update()
 
-    if len(firm_list) <15 and  random.random() < (1/90):
+    if len(firm_dict) <15 and  random.random() < (1/90):
         print('создана новая фирма')
         f = create_firm()
+        firm_dict[f.id] = f
         init_firm(f, people)
-        firm_list.append(f)
     session.commit()
 
 # ---------------------------------------------

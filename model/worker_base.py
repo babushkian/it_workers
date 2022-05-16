@@ -61,8 +61,8 @@ class Position():
             # отнимаю от позиции единицу, чтобы безработные не увеличивали степень в формуле
             base_mod = 1 / (YEAR_LENGTH * Position.PROGRESSION ** (self.__position-1))
             # умножает время перехода на следующую должность. Для умных время до повыщения сокращается
-            chisl = (2 * settings.TALENT_MAX + talent)
-            talent_mod = chisl / settings.TALENT_RANGE
+            chisl = (2 * settings.TRAIT_MAX + talent)
+            talent_mod = chisl / settings.TRAIT_RANGE
             experience_mod = (1 + settings.EXPERIENCE_CAP * experience)
             if x < base_mod * talent_mod * experience_mod:
                 self.__position += 1

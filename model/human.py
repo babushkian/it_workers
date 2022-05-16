@@ -1,7 +1,7 @@
 from typing import Optional
 
 from datetime import timedelta, date
-from random import choice, randint, random
+from random import choice, randint, random, gauss, sample
 
 from sqlalchemy import Column, Integer, String, Date, ForeignKey
 from sqlalchemy.orm import relationship
@@ -23,7 +23,8 @@ from settings import (get_birthday,
                       YEAR_LENGTH,
                       DEATH_MIN_AGE,
                       UNEMPLOYED_POSITION,
-                      POSITION_CAP,)
+                      POSITION_CAP,
+                      TRAIT_MAX,)
 
 
 class People(Base):
@@ -58,7 +59,9 @@ class People(Base):
         self.second_name = choice(settings.second_name)  #
         self.last_name = choice(settings.last_name)  #
         self.birth_date = get_birthday()  # день рождения
-        self.talent = randint(settings.TALENT_MIN, settings.TALENT_MAX)
+        self.talent = randint(settings.TRAIT_MIN, settings.TRAIT_MAX)
+        self.health = randint(settings.TRAIT_MIN, settings.TRAIT_MAX)
+        self.ambitions = randint(settings.TRAIT_MIN, settings.TRAIT_MAX)
         self.start_work = None # сначала присваиваем None, потом вызываем функцию
         # изначально человек не имеет никакой должности Инициализируется, чтобы в методе assign
         # проверять, не привоена ли ему уже должность (директор фирмы)
@@ -97,15 +100,31 @@ class People(Base):
         '''
         if self.status.status == Status.UNEMPLOYED:
             self.assign_to_firm(firm_id)
-        else: #  осталась молодежь - записываем, что она не
+        else: #  осталась молодежь - просто фиксируем, что она не принадлежит никакой фирме  и имеет статус безработный
             self.migrate_record()
             self.change_position_record()
 
+
+    def define_work_period(self, firm_id):
+        self.days_in_firm = 0
+        wp = max(10, int(365 *
+                    (3
+                    + 2 *(People.obj_firms[firm_id].last_rating - self.talent * self.pos.position) / (TRAIT_MAX * POSITION_CAP)
+                    - 2 * (self.ambitions / TRAIT_MAX)
+                    + gauss(0, .5)
+                    ) - self.experience*.01
+                    )
+                 )
+        self.work_period  = wp
+        print(f'{self.work_period=}')
+
     def assign_to_firm(self, firm_id=None):
+
         if firm_id:
             self.set_current_firm_id(firm_id)
         else:
             self.set_current_firm_id(Firm.get_rand_firm_id())
+        self.define_work_period(self.current_firm_id)
         if self.start_work is None:
             self.start_work = get_anno()
         self.migrate_record()
@@ -150,10 +169,7 @@ class People(Base):
 
     def director_retired(self):
         print(f'старый директор id {self.id:3d} ушел из фирмы {self.current_firm_id:3d}')
-        for f in People.obj_firms:
-            if f.id == self.current_firm_id:
-                f.director = None
-                break
+        People.obj_firms[self.current_firm_id].director = None
 
     def set_retired(self):
         print(f'{get_anno()} id: {self.id:3d} age: {self.age:3d} Retired')
@@ -184,22 +200,24 @@ class People(Base):
 
     @property
     def experience(self):
-        return (get_anno() - self.start_work).days
+        return (get_anno() - self.start_work).days if self.start_work else 0
 
 
     def check_illness(self):
-        return random() < 1/350
+        return random() < 1/380
 
     def check_unemployed(self):
-        return random() < 1 / 800
+        if self.days_in_firm > self.work_period:
+            return random() < 1 / 30
+        return False
 
     def get_illness(self):
         self.ill_counter = int(1 / (0.13 * random() + 0.008) )
-        print(f'{get_anno()} id: {self.id:3d} заболел. срок болезни: {self.ill_counter} дней')
+        #print(f'{get_anno()} id: {self.id:3d} заболел. срок болезни: {self.ill_counter} дней')
         self.status.set_status_ill()
 
     def go_to_work(self):
-        print(f'{get_anno()} id: {self.id:3d} вылечился')
+        #print(f'{get_anno()} id: {self.id:3d} вылечился')
         self.status.set_status_employed()
 
     def get_unemployed(self):
@@ -233,6 +251,7 @@ class People(Base):
                     # сначала смотрим, не заболел ли человек
                     # потом проверяемЮ не уволился ли
                     # если не уволился и не заболел проверяем на повышение и переход в другую фирму
+                    self.days_in_firm += 1
                     ill  = self.check_illness()
                     if ill:
                         self.get_illness()
@@ -245,8 +264,9 @@ class People(Base):
                         promoted = self.pos.promotion(self.talent, self.experience)
                         if promoted:
                             self.change_position_record()
-                        transfered = self.migrate()
+                        transfered = self.check_migrate()
                         if transfered:
+                            self.migrate()
                             self.migrate_record()
 
 
@@ -268,26 +288,38 @@ class People(Base):
             firm_to_id=self.current_firm_id,
             move_to_firm_date=get_anno()))
 
+
+
+    def check_migrate(self):
+        if self.days_in_firm > self.work_period:
+             return random() <1/10 # должен перейти на другую работу за 10 дней
+        return False
+
     def migrate(self, firm_id=None):
         '''
         Переходим в другую фирму
         '''
         if firm_id is not None: # принудительный переход в конкретную фирму
             self.set_current_firm_id(firm_id)
-            return True
         else:
             # директору не стоит уходить из своей фирмы
             # если отсутствие работы тоже считать фирмой, то директор даже уволиться не может
             if self.pos.position < POSITION_CAP:
-                targ = Firm.get_rand_firm_id()
-                if self.current_firm_id != targ:
-                    targ_firm_rating = session.query(Firm.last_rating).filter(Firm.id == targ).scalar()
-                    attraction_mod = targ_firm_rating - self.recent_firm.last_rating
-                    chanse = (40 + attraction_mod) / (40 * 365)
-                    if random() < chanse:
-                        self.set_current_firm_id(targ)
-                        return True
-            return False
+                pool_ids = Firm.firm_to_migrate_ids(self.current_firm_id)
+                if len(pool_ids)>3:
+                    pool_ids = sample(pool_ids, k=3)
+                assert len(pool_ids), 'Пустой список фирм, в одну из которых человек хочет перевестись'
+                # изменить запрос на .first()    .all() здесь только для наглядности списка фирм
+                migr_firm_id = session.query(Firm).filter(Firm.id.in_(pool_ids)).order_by(Firm.last_rating.desc()).all()
+                for  f in migr_firm_id:
+                    print(f.id, f.last_rating)
+                self.set_current_firm_id(migr_firm_id[0].id)
+                print(f'Личный рейтинг: {self.pos.position*self.talent}')
+                print(f'Уходим в фирму {migr_firm_id[0].id}')
+        self.define_work_period(self.current_firm_id)
+
+
+
 
     def __repr__(self):
         s = f'id: {self.id} {self.last_name} {self.first_name} {self.second_name}, {self.birth_date},'\
