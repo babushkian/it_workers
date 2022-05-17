@@ -1,5 +1,5 @@
 ﻿from sqlalchemy.engine import Engine
-from sqlalchemy import create_engine,  event
+from sqlalchemy import create_engine, event, func
 from sqlalchemy.orm import sessionmaker
 import random
 random.seed(667)
@@ -32,15 +32,16 @@ from settings import (SIM_YEARS, time_pass, YEAR_LENGTH,
                         INITIAL_PEOPLE_NUMBER,
                         INITIAL_FIRM_NUMBER,
                         POSITION_CAP,
+                        get_anno,
                       )
 
 from model.status import Status, statnames, StatusName, PeopleStatus
 from model.worker_base import (
-                               LastSimDate,
-                               PosBase,
-                               FirmName,
-                               Position
-                               )
+    LastSimDate,
+    PosBase,
+    FirmName,
+    Position, FirmRating
+)
 from model.firm import Firm
 from model.human import People
 
@@ -135,6 +136,22 @@ def assign_people_to_firms(people):
     session.commit()
 
 
+def update_all_firms_ratings():
+    rating = (session.query(People.id, People.current_firm_id, (People.talent * People.last_position_id).label('rating'))
+              .filter(People.current_firm_id != None)
+              .cte(name='rating')
+              )
+    firm_rating = (
+        session.query(rating.c.current_firm_id.label('firm'), func.avg(rating.c.rating).label('firm_rating'), func.count(rating.c.id).label('people_count'))
+            .filter(rating.c.current_firm_id != None)
+            .group_by(rating.c.current_firm_id)
+            .all()
+    )
+    for i in firm_rating:
+        if firm_dict[i.firm].close_date is None :
+            session.add(FirmRating(firm_id=i.firm, rating=i.firm_rating, workers_count=i.people_count, rate_date=get_anno()))
+            session.query(Firm).filter(Firm.id == i.firm).update({Firm.last_rating:i.firm_rating})
+    session.flush()
 
 create_postiton_names()
 create_staus_names()
@@ -164,10 +181,14 @@ for t in range(int(YEAR_LENGTH * SIM_YEARS)):
     for f in firm_dict.values():
         if f.close_date is None:
             f.update()
+    if get_anno().day == 1 and get_anno().month in [3, 6, 9, 12]:
+        update_all_firms_ratings()
+
+
     for p in people:
         p.update()
 
-    if len(firm_dict) <15 and  random.random() < (1/90):
+    if len(firm_dict) <22 and  random.random() < (1/90):
         print('создана новая фирма')
         f = create_firm()
         firm_dict[f.id] = f

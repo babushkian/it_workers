@@ -116,4 +116,5 @@ class FirmRating(Base):
     id = Column(Integer, primary_key=True)
     firm_id = Column(Integer, ForeignKey('firms.id'))
     rating = Column(Integer)
-    rdate = Column(Date)
+    workers_count = Column(Integer)
+    rate_date = Column(Date)

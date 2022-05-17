@@ -20,7 +20,7 @@ basefile = 'mega_workers.db'
 if Path(basefile).exists() == False:
     basefile ='workers.db'
 
-engine = create_engine(f"sqlite:///{basefile}", echo=False)
+engine = create_engine(f"sqlite:///{basefile}", echo=True)
 Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
@@ -72,15 +72,34 @@ def unemp_after_sin_init():
             print(i.people_id, i.status_name.name, i.status_date)
 
 
+# рейтинг всех фирм
+def new_rating():
+    # таблица рейтинга всех людей (добавляе поле рейтинг)
+    rating =  session.query(People.id, People.current_firm_id, (People.talent*People.last_position_id).label('rating')).cte(name='rating')
+    firm_rating =  (session.query(rating.c.current_firm_id.label('firm'), func.avg(rating.c.rating).label('firm_rating'), func.count(rating.c.id).label('people_count'))
+        .filter(rating.c.current_firm_id != None)
+        .group_by(rating.c.current_firm_id)
+                    .all()
+                    )
+    for i in firm_rating:
+        print(f'firm id: {i.firm:3d} rating: {i.firm_rating:6.2f} people in firm: {i.people_count:3d}')
 
-# проверить есть ли у кого-то на момент генерации статус UNEMPLOYED
+    #print(dir(Base.metadata.tables['people']))
+    print(Base.metadata.tables['people'].columns)
+    a = Base.metadata.tables['people']
+    x = session.query(a).limit(10)
+    for i in x:
+        print(i.current_firm_id)
+
+# # проверить есть ли у кого-то на момент генерации статус UNEMPLOYED
 # проверить, что у всех людей со статусом EMPLOYED фирма, к которой они приписаны не равна None
 
 # сделать подсчет трудового опыта с учетом больничных и периодов безработности.
 
 
-
-young_people()
+# young_people()
 # able_people_on_start()
 # unemp_after_sin_init()
+
+new_rating()
 

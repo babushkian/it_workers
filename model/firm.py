@@ -43,6 +43,10 @@ class Firm(Base):
 
     def assign_new_director(self):
         candidats = [i for i in Firm.obj_people if i.current_firm_id == self.id]
+        # Если в фирме не сталось ни одного сотрудника, закрываем её
+        if len(candidats) < 1:
+            self.close()
+            return
         candidats.sort(key = lambda x: 2*x.pos.position + x.talent, reverse=True)
         print('========================')
         print(f'в фриме {self.id} {self.firmname.name} смена руководства')
@@ -106,7 +110,7 @@ class Firm(Base):
 
 
 
-    def update(self):
+    def update_old(self):
         '''
         В первый день года обновляется рейтинг фирмы
         А так же проверяется, есть ли у фирмы деректор. Если нет, назначается новый
@@ -116,12 +120,21 @@ class Firm(Base):
         if self.director is None:
             self.assign_new_director()
 
+    def update(self):
+        '''
+        В первый день года обновляется рейтинг фирмы
+        А так же проверяется, есть ли у фирмы деректор. Если нет, назначается новый
+        '''
+        if self.director is None:
+            self.assign_new_director()
+
+
     def  new_rating(self)->int:
         '''
         Новое значение рейтинга фирмы генерится случайно
         '''
         self.last_rating = self.director.talent * POSITION_CAP
-        session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
+        session.add(FirmRating(firm_id=self.id, rating=self.last_rating, workers_count=1,rate_date=get_anno()))
 
     def close(self):
         print(f'Фирма {self.firmname.name} закрылась')
@@ -141,7 +154,7 @@ class Firm(Base):
         if self.rating_multiplier < .05:
             self.rating_multiplier = 0
         self.last_rating  = statistics.mean(workers_rating)* (1 + self.rating_multiplier)
-        session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rdate=get_anno()))
+        session.add(FirmRating(firm_id=self.id, rating=self.last_rating, rate_date=get_anno()))
 
     def __repr__(self):
         return f'<id:{self.id} "{self.firmname.name}"  рейтинг: {self.last_rating}>'

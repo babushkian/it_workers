@@ -275,7 +275,7 @@ def annual_avg_age():
     print('------------------')
     print('Средний возраст:')
 
-    x = session.query(distinct(FirmRating.rdate)).filter(FirmRating.rdate.like('%01-01%')).all()
+    x = session.query(distinct(FirmRating.rate_date)).filter(FirmRating.rate_date.like('%01-01%')).all()
     for i in x:
         check_date=i[0]
         y = (session.query(People.birth_date)
