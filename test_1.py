@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from sqlalchemy import create_engine, event, cast, Date
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, joinedload, aliased
-from sqlalchemy.sql import func, distinct, exists, or_
+from sqlalchemy.sql import func, distinct, exists, or_, and_
 from pathlib import Path
 from model import Base, bind_session
 
@@ -132,10 +132,12 @@ def worker_count_correlation_with_ratings(firm_id):
     # for i in rait_rec:
     #     print(i.rate_date, i.rating, i.workers_count)
     matches = dict()
+    personel_1 = dict()
 
     work_process = dates.copy()
 
     for r in rait_rec:
+        personel_1[r.rate_date] = r.workers_count
         to_del = list()
         for d in sorted(work_process):
             if d > r.rate_date:
@@ -149,9 +151,42 @@ def worker_count_correlation_with_ratings(firm_id):
         for i in to_del:
             del work_process[i]
 
+    personel_2 = dict()
     for i in matches:
         alter_workers_count = None if matches[i] is None else dates[matches[i]]
+        personel_2[i.rate_date] = alter_workers_count
         print(i.rate_date, matches[i], i.workers_count, alter_workers_count)
+    return personel_1, personel_2
+
+
+def hired_and_fired_on_specific_date(spec_firm, spec_date):
+    # выбираем все записи, когда человек пришел в указанную фирму, а потом ушел из нее
+    fired = aliased(PeopleFirm, name = 'fired')
+    workers_in_out = (session.query(PeopleFirm.id)
+               # прийти и уйти должен один человек
+               # прийти и уйти нужно из одной и той эе фирмы
+               .join(fired, and_(fired.people_id == PeopleFirm.people_id, fired.firm_from_id == PeopleFirm.firm_to_id))
+               # дата ухода из фирмы должна быть позже даты прихода в фирму
+               .filter(fired.move_to_firm_date > PeopleFirm.move_to_firm_date)
+               # идетификатор фирмы и интересующая дата
+               .filter(PeopleFirm.firm_to_id==spec_firm, PeopleFirm.move_to_firm_date <= spec_date)
+               # уйти из фирмы человек должен вплоть до интересующей нас даты, иначе он в этой фирме работает на указанную дату
+               .filter(fired.move_to_firm_date < spec_date)
+               .order_by(PeopleFirm.people_id)
+                      )
+    b = workers_in_out.all()
+    # берем все записи о приходе в конкретную фирму
+    # и отнимаем все записи, где известно, что позже человек ушел из фирмы
+    workers_in = (session.query(PeopleFirm.id)
+                  .filter(PeopleFirm.firm_to_id == spec_firm)
+                  .filter(PeopleFirm.move_to_firm_date <= spec_date)
+                  .filter(PeopleFirm.id.notin_(workers_in_out))
+                  .all())
+
+    #print(workers_in)
+    #print(f'фирма {spec_firm:3d} | {spec_date} Количество сотрудников: {len(workers_in):3d}')
+    #print(b)
+    return(len(workers_in))
 
 
 
@@ -167,5 +202,23 @@ def worker_count_correlation_with_ratings(firm_id):
 
 # new_rating()
 # странный_доступ_к_таблице()
-# histiory_of_workers_in_firm(16)
-worker_count_correlation_with_ratings(7)
+MY_FIRM_ID = 2
+# histiory_of_workers_in_firm(MY_FIRM_ID)
+personel_1, personel_2 = worker_count_correlation_with_ratings(MY_FIRM_ID)
+
+
+# hired_and_fired_on_specific_date(2, '2007-01-01')
+
+personel_3 = dict()
+rating_dates = session.query(distinct(FirmRating.rate_date)).filter(FirmRating.firm_id==MY_FIRM_ID).order_by(FirmRating.rate_date).all()
+for i in rating_dates:
+    personel_3[i[0]] = hired_and_fired_on_specific_date(MY_FIRM_ID, i[0])
+print(personel_1)
+print(personel_2)
+print(personel_3)
+
+for d in personel_3:
+    p1 = personel_1[d] if personel_1.get(d) else None
+    p2 = personel_2[d] if personel_2.get(d) else None
+    p3 = personel_3[d]
+    print(d, p1, p2, p3)
