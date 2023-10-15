@@ -20,7 +20,7 @@ basefile = 'mega_workers.db'
 if Path(basefile).exists() == False:
     basefile ='workers.db'
 
-engine = create_engine(f"sqlite:///{basefile}", echo=False)
+engine = create_engine(f"sqlite:///{basefile}", echo=True)
 Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
@@ -28,7 +28,7 @@ bind_session(session)
 
 from model.status import StatusName, PeopleStatus
 from model.human import People
-from model.worker_base import (PosBase,
+from model.worker_base import (PositionNames,
                                LastSimDate,
                                PeopleFirm, PeoplePosition,
                                Position,
@@ -51,22 +51,22 @@ def all_people_count():
 def mean_qualification():
     # средняя квалификация по всем людям
     print('=' * 20)
-    # mean_pos = session.query(func.sum(People.last_position_id).label('p_sum'), func.count(People.last_position_id).label('p_count')).one()
-    avg_pos = session.query(func.avg(People.last_position_id)).scalar()
+    # mean_pos = session.query(func.sum(People.current_position_id).label('p_sum'), func.count(People.current_position_id).label('p_count')).one()
+    avg_pos = session.query(func.avg(People.current_position_id)).scalar()
 
     #print(f"Среняя квалификация людей: {mean_pos.p_sum / mean_pos.p_count}")
     print(f"Среняя квалификация людей: {avg_pos:5.3f}")
 
 def talent_mean_qualification():
     # средняя квалификация в зависимости от таланта
-    p_tal = session.query(func.sum(People.last_position_id).label('tal_sum'), func.count(People.talent).label('tal_count'), People.talent)\
+    p_tal = session.query(func.sum(People.current_position_id).label('tal_sum'), func.count(People.talent).label('tal_count'), People.talent)\
         .group_by(People.talent).order_by(People.talent).all()
     print('средняя квалификация в зависимости от таланта')
     for i in p_tal:
         print(i.talent, i.tal_sum/i.tal_count)
     print('-----------------------------')
     print('То же самое, но короче')
-    avg_tal = (session.query(func.avg(People.last_position_id).label('tal_avg'), func.count(People.talent).label('tal_count'), People.talent)
+    avg_tal = (session.query(func.avg(People.current_position_id).label('tal_avg'), func.count(People.talent).label('tal_count'), People.talent)
                 .group_by(People.talent).order_by(People.talent).all()
                )
     for i in avg_tal:
@@ -77,16 +77,16 @@ def talent_mean_qualification():
 def real_positions():
     # выборка имеющихся должностей
     print('=' * 20, '\nИдентификаторы должностей, имеющихся среди людей.')
-    psd = session.query(distinct(People.last_position_id)).order_by(People.last_position_id).all()
+    psd = session.query(distinct(People.current_position_id)).order_by(People.current_position_id).all()
     print(psd)
 
 def positions_distribution():
     # РАСПРЕДЕЛЕНИЕ ЛЮДЕЙ ПО ДОЛЖНОСТЯМ
     print('*' * 40, '\nРаспределение должностей среди людей')
-    x = (session.query(func.count(People.id).label('cont'), PosBase.name)
-         .join(PosBase)
-         .group_by(People.last_position_id)
-         .order_by(People.last_position_id).all()
+    x = (session.query(func.count(People.id).label('cont'), PositionNames.name)
+         .join(PositionNames)
+         .group_by(People.current_position_id)
+         .order_by(People.current_position_id).all()
          )
     for y in x:
         print(y.cont, y.name)
@@ -197,9 +197,9 @@ def promotion_dates():
 
     print('-----------------------------')
     print('Даты повышения человека --- сложное соединение с явеым указанием усовмй соединения')
-    h = (session.query(People, PeoplePosition.position_id, PeoplePosition.move_to_position_date, PosBase.name)
+    h = (session.query(People, PeoplePosition.position_id, PeoplePosition.move_to_position_date, PositionNames.name)
          .join(PeoplePosition, PeoplePosition.people_id == People.id)
-         .join(PosBase, PosBase.id == PeoplePosition.position_id)
+         .join(PositionNames, PositionNames.id == PeoplePosition.position_id)
          .filter(People.id<8)
          .order_by(People.id)
          .all()
@@ -453,7 +453,7 @@ def status_distriburion_2():
     for i in x:
         print(i.people_id,  i.status_name.name, i.status_date)
 
-# all_people_count()
+all_people_count()
 # mean_qualification()
 # talent_mean_qualification()
 # real_positions()
@@ -477,6 +477,10 @@ def status_distriburion_2():
 # retired_directors()
 # firms_without_directors() # не заработала как надо
 # status_distriburion()
-status_distriburion_2()
+
+
+# status_distriburion_2()
+
+
 # ежегодный отчет по количеству сотрудников в фирмах
 # как часто люди переходят из одной фирмы в другую?
