@@ -1,6 +1,6 @@
 from random import choice, randint
 
-from sqlalchemy import Column, Integer, ForeignKey, Date
+from sqlalchemy import Column, Integer, ForeignKey, Date, select
 from sqlalchemy.orm import relationship
 
 import statistics
@@ -19,7 +19,7 @@ class Firm(Base):
     close_date = Column(Date)
     ratings = relationship('FirmRating', backref='firms')
     firmname = relationship('FirmName', back_populates="firm_with_name", uselist=False, innerjoin=True)
-    recent_emploees = relationship('People', back_populates='recent_firm')
+    current_emploees = relationship('People', back_populates='recent_firm')
     people = relationship('PeopleFirm', back_populates='firm_conn')
 
     obj_people = None
@@ -31,42 +31,43 @@ class Firm(Base):
         self.director = None
         self.rating_multiplier = 1.0
 
+    def personal(self) -> list['People']:
+        return [i for i in Firm.obj_people if i.current_firm_id == self.id]
 
-    def initial_assign_director(self, director: 'People'):
-        self.director = director
-        self.new_rating()
-        director.migrate(firm_id=self.id)
-        director.status.set_status_employed()
-        director.migrate_record()
-        director.pos.become_director()
-        director.change_position_record()
+    def check_close(self) -> bool:
+        if len(self.personal()) == 0:
+            self.close_firm()# закрываем фирму, если в ней никого не осталось
+            return True
+        return False
+
+    def check_assign_director(self):
+        if self.close_date is None:  # если ушел директор, назначаем нового
+            self.assign_new_director()
+
 
     def assign_new_director(self):
-        candidats = [i for i in Firm.obj_people if i.current_firm_id == self.id]
-        # Если в фирме не сталось ни одного сотрудника, закрываем её
-        if len(candidats) < 1:
-            self.close()
-            return
-        candidats.sort(key = lambda x: 2*x.pos.position + x.talent, reverse=True)
+        candidates = self.personal()
+        # сортируем по способностям - кого лучше назначить
+        candidates.sort(key=lambda x: 2 * x.pos.position + x.talent, reverse=True)
         print('========================')
         print(f'в фриме {self.id} {self.firmname.name} смена руководства')
-        print(f'Всего сотрудников в фирме: {len(candidats)}')
+        print(f'Всего сотрудников в фирме: {len(candidates)}')
         print('Кандидаты на пост директора:')
-        for i in candidats:
+        for i in candidates:
             print(f'id: {i.id:3d} position:{i.pos.position:3d} talent: {i.talent:3d}')
-        self.director = candidats[0]
+        self.director = candidates[0]
+        self.director.pos.set_position_director()
         print(f'Новый директор: {self.director}')
-        self.director.pos.become_director()
-        self.director.change_position_record()
+
 
     @staticmethod
     def operating_firms_list()->list[int]:
         '''
         возвращает список id фирм, у которых не проставлена дата закрытия, то есть работающих фирм
         '''
-        pool = session.query(Firm.id).filter(Firm.close_date.is_(None)).all()
-        pool = [i.id for i in pool]
-        return pool
+        q = select(Firm.id).filter(Firm.close_date.is_(None))
+        res = session.scalars(q).all()
+        return res
 
     @staticmethod
     def get_rand_firm_id()->int:
@@ -84,13 +85,14 @@ class Firm(Base):
         return pool
 
     @staticmethod
-    def get_unused_firmname_id()->int:
+    def get_unused_firmname_id() -> int:
         '''
         Возвращает случайный идентификатор имени фирмы из списка незанятых
         '''
-        pool = session.query(FirmName.id).filter(FirmName.used==False).all()
-        assert len(pool) > 0, 'нет свободных названий фирм'
-        new_id = choice(pool)[0]
+        q = select(FirmName.id).where(FirmName.used == False)
+        pool = session.scalars(q).all()
+        assert len(pool) > 0, 'не осталось свободных названий фирм'
+        new_id = choice(pool)
         return new_id
 
 
@@ -110,44 +112,23 @@ class Firm(Base):
 
 
 
-    def update_old(self):
-        '''
-        В первый день года обновляется рейтинг фирмы
-        А так же проверяется, есть ли у фирмы деректор. Если нет, назначается новый
-        '''
-        if get_anno().day == 1 and get_anno().month in [3, 6, 9, 12]:
-            self.update_rating()
-        if self.director is None:
-            self.assign_new_director()
-
-    def update(self):
-        '''
-        В первый день года обновляется рейтинг фирмы
-        А так же проверяется, есть ли у фирмы деректор. Если нет, назначается новый
-        '''
-        if self.director is None:
-            self.assign_new_director()
-
-
-    def  new_rating(self)->int:
+    def  new_rating(self):
         '''
         Новое значение рейтинга фирмы генерится случайно
         '''
         self.last_rating = self.director.talent * POSITION_CAP
-        session.add(FirmRating(firm_id=self.id, rating=self.last_rating, workers_count=1,rate_date=get_anno()))
+        session.add(FirmRating(firm_id=self.id, rating=self.last_rating, workers_count=1, rate_date=get_anno()))
 
-    def close(self):
+    def close_firm(self):
+        # !!!! А еще нужно принудительно переключить статус всех работников в безработные
         print(f'Фирма {self.firmname.name} закрылась')
         for i in Firm.obj_people:
             if i.current_firm_id == self.id:
-                i.get_unemployed()
+                i.set_assigned_firm_to_none()
         self.close_date = get_anno()
 
 
     def update_rating(self):
-        '''
-        Изменение рейтинга генерится случайно, и делается запись об изменении рейтинга.
-        '''
         workers_rating = [i.pos.position*i.talent for i in Firm.obj_people if i.current_firm_id == self.id]
         if self.rating_multiplier > 0:
             self.rating_multiplier *= 0.8

@@ -7,3 +7,9 @@ sim_*
 *workers.db
 old
 /it_workers.sql
+
+log.txt
+*.sql
+/doctest-output
+/model/cred.py
+.env
