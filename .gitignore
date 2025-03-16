@@ -7,7 +7,7 @@ sim_*
 *workers.db
 old
 /it_workers.sql
-
+.venv/
 log.txt
 *.sql
 /doctest-output
